@@ -37,4 +37,11 @@ result : tailwind able to scan all the template files
 @tailwind components;
 @tailwind utilities;
 ```
-result : tailwind features can be used inside the project
+result : tailwind features can be used inside the project. Dont forget to change language mode into tailwind instead of css so all warnings about tailwind disappear.
+
+<br><br>
+
+### npm libraries added
+```
+npm install axios
+```
