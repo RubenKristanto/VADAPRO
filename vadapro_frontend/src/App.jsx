@@ -1,11 +1,10 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import LoginPage from './LoginPage.jsx'
+import OrganizationsPage from './OrganizationsPage.jsx'
+import { authService } from './services/authentication.js'
 import './App.css'
 
 function App() {
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
 
@@ -49,24 +48,6 @@ function App() {
           onLoginSuccess={handleLoginSuccess}
         />
       )}
-=======
-
-  return (
-    <div className="App">
-      <LoginPage />
->>>>>>> parent of 7c701f6 (organizations page added)
-=======
-
-  return (
-    <div className="App">
-      <LoginPage />
->>>>>>> parent of 7c701f6 (organizations page added)
-=======
-
-  return (
-    <div className="App">
-      <LoginPage />
->>>>>>> parent of 7c701f6 (organizations page added)
     </div>
   )
 }
