@@ -4,8 +4,8 @@ export const authService = {
   // Login function
   async login(credentials) {
     try {
-      const response = await axiosAPI.post('/login', credentials);
-      // Simulate token and user for demo purposes
+      const response = await axiosAPI.post('/auth/login', credentials);
+      // Check if the response indicates success
       if (response.data.message === 'Login successful') {
         const token = 'demo-token';
         const user = { username: credentials.username };
