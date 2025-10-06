@@ -13,12 +13,7 @@ exports.register = async (req, res) => {
     await newUser.save();
     res.status(201).json({ message: 'User registered successfully' });
   } catch (err) {
-    console.error('❌ Registration error:', err.message);
-    console.error('Full error:', err);
-    res.status(500).json({ 
-      message: 'Server error', 
-      error: process.env.NODE_ENV === 'development' ? err.message : 'Internal server error'
-    });
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -34,11 +29,6 @@ exports.login = async (req, res) => {
       res.status(400).json({ message: 'Invalid credentials' });
     }
   } catch (err) {
-    console.error('❌ Login error:', err.message);
-    console.error('Full error:', err);
-    res.status(500).json({ 
-      message: 'Server error', 
-      error: process.env.NODE_ENV === 'development' ? err.message : 'Internal server error'
-    });
+    res.status(500).json({ message: 'Server error' });
   }
 };

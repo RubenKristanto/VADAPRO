@@ -12,7 +12,6 @@ function App() {
     // Check if user is already authenticated on app start
     const authenticated = authService.isAuthenticated()
     setIsAuthenticated(authenticated)
-    
     setIsLoading(false)
   }, [])
 
@@ -26,27 +25,15 @@ function App() {
   }
 
   if (isLoading) {
-    return (
-      <div className="App">
-        <div className="loading-container">
-          <div className="loading-spinner"></div>
-          <p>Loading application...</p>
-        </div>
-      </div>
-    )
+    return <div className="App">Loading...</div>
   }
 
   return (
     <div className="App">
-      {/* Main application content */}
       {isAuthenticated ? (
-        <OrganizationsPage 
-          onLogout={handleLogout}
-        />
+        <OrganizationsPage onLogout={handleLogout} />
       ) : (
-        <LoginPage 
-          onLoginSuccess={handleLoginSuccess}
-        />
+        <LoginPage onLoginSuccess={handleLoginSuccess} />
       )}
     </div>
   )
