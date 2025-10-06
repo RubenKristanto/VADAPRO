@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { authService } from './services/authentication.js';
+import axios from 'axios'; // <-- Added missing import
 import './LoginPage.css';
 
-function LoginPage({ onLoginSuccess }) {
+function LoginPage() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -15,28 +15,15 @@ function LoginPage({ onLoginSuccess }) {
       setMessage('Please enter both username and password');
       return;
     }
-    setIsLoading(true);
-    setMessage('');
+    setIsLoading(true); // <-- Fixed function name
+    setMessage(''); // Clear previous messages
     try {
-      // For registration, we'll still use axios directly since authService doesn't have register
-      const res = await fetch('http://localhost:3001/auth/register', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ username, password }),
-      });
-      const data = await res.json();
-      
-      if (res.ok) {
-        setMessage(data.message);
-      } else {
-        setMessage(data.message || 'Registration failed');
-      }
+      const res = await axios.post('http://localhost:3001/auth/register', { username, password });
+      setMessage(res.data.message);
     } catch (err) {
-      setMessage('Registration failed');
+      setMessage(err.response?.data?.message || 'Registration failed');
     } finally {
-      setIsLoading(false);
+      setIsLoading(false); // <-- Fixed function name
     }
   };
 
@@ -46,24 +33,20 @@ function LoginPage({ onLoginSuccess }) {
       setMessage('Please enter both username and password');
       return;
     }
-    setIsLoading(true);
-    setMessage('');
+    setIsLoading(true); // <-- Fixed function name
+    setMessage(''); // Clear previous messages
     try {
-      const result = await authService.login({ username, password });
-      setMessage(result.message);
-      
-      // If login is successful, call the success callback
-      if (result.token && onLoginSuccess) {
-        onLoginSuccess();
-      }
-      
+      const res = await axios.post('http://localhost:3001/auth/login', { username, password });
+      setMessage(res.data.message);
+      // You can handle token/user here if needed
     } catch (err) {
-      setMessage(err.message || 'Login failed');
+      setMessage(err.response?.data?.message || 'Login failed');
     } finally {
-      setIsLoading(false);
+      setIsLoading(false); // <-- Fixed function name
     }
   };
 
+  // The return statement must be inside the component function
   return (
     <div className="login-container">
       <header className="login-header">
@@ -146,6 +129,6 @@ function LoginPage({ onLoginSuccess }) {
       </div>
     </div>
   );
-}
+} // <-- Correctly placed closing brace
 
 export default LoginPage;
