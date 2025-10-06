@@ -5,4 +5,4 @@ const userSchema = new mongoose.Schema({
   password: { type: String, required: true, minlength: 3 }
 });
 
-module.exports = mongoose.model('User', userSchema);
+module.exports = mongoose.model('User', userSchema, 'accounts'); // Explicitly specify collection name 'accounts'
