@@ -44,9 +44,9 @@ vadapro_backend/
 	```
 
 3. **Create .env file**
-	Add your MongoDB connection string to be able to connect to atlas:
+	Add your MongoDB connection string to be able to connect to atlas (use the legacy string, not srv):
 	```
-	MONGO_URI=mongodb+srv://<username>:<password>@vadapro.630jtbb.mongodb.net/VADAPRO_Data?retryWrites=true&w=majority&appName=Vadapro
+	mongodb://<username>:<password>@ac-v2w2wd3-shard-00-00.630jtbb.mongodb.net:27017,ac-v2w2wd3-shard-00-01.630jtbb.mongodb.net:27017,ac-v2w2wd3-shard-00-02.630jtbb.mongodb.net:27017/VADAPRO_Data?ssl=true&replicaSet=atlas-a1tlum-shard-0&authSource=admin&retryWrites=true&w=majority&appName=Vadapro
 	PORT=3001
 	```
 
