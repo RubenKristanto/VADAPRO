@@ -2,7 +2,7 @@ import { useState } from 'react';
 import axios from 'axios';
 import './OrganizationsPage.css';
 
-function OrganizationsPage({ onLogout }) {
+function OrganizationsPage({ onLogout, onOrganizationSelect }) {
   const [organizations, setOrganizations] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [newOrgName, setNewOrgName] = useState('');
@@ -53,6 +53,12 @@ function OrganizationsPage({ onLogout }) {
     cancelDelete();
   };
 
+  const handleOrganizationClick = (org) => {
+    if (onOrganizationSelect) {
+      onOrganizationSelect(org);
+    }
+  };
+
   return (
     <div className="organizations-container">
       <header className="organizations-header">
@@ -83,10 +89,13 @@ function OrganizationsPage({ onLogout }) {
             
             <div className="organizations-grid">
               {organizations.map(org => (
-                <div key={org.id} className="organization-item">
+                <div key={org.id} className="organization-item" onClick={() => handleOrganizationClick(org)}>
                   <div className="organization-name">{org.name}</div>
                   <button 
-                    onClick={() => initiateDelete(org)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      initiateDelete(org);
+                    }}
                     className="delete-btn"
                   >
                     ×
