@@ -45,7 +45,7 @@ function LoginPage({ onLoginSuccess }) {
         // Small delay to show success message before transition
         setTimeout(() => {
           if (onLoginSuccess) {
-            onLoginSuccess();
+            onLoginSuccess(result.user);
           }
         }, 500);
       } else {

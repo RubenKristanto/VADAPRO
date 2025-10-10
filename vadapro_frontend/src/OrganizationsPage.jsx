@@ -1,11 +1,14 @@
-import { useState } from 'react';
-import axios from 'axios';
+import { useState, useEffect } from 'react';
 import './OrganizationsPage.css';
+import organizationService from './services/organizationService';
+import MemberManagement from './components/MemberManagement';
 
-function OrganizationsPage({ onLogout, onOrganizationSelect }) {
+function OrganizationsPage({ onLogout, onOrganizationSelect, currentUser }) {
   const [organizations, setOrganizations] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [newOrgName, setNewOrgName] = useState('');
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   
   // Deletion confirmation states
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -13,14 +16,112 @@ function OrganizationsPage({ onLogout, onOrganizationSelect }) {
   const [deleteConfirmName, setDeleteConfirmName] = useState('');
   const [confirmationStep, setConfirmationStep] = useState('name'); // 'name' or 'final'
 
-  const createOrganization = () => {
-    if (newOrgName.trim()) {
-      const newOrg = {
-        id: Date.now(), // Simple ID generation
-        name: newOrgName.trim()
-      };
-      setOrganizations([...organizations, newOrg]);
-      setNewOrgName('');
+  // Edit organization states
+  const [editingOrg, setEditingOrg] = useState(null);
+  const [editOrgName, setEditOrgName] = useState('');
+
+  // Member management states
+  const [showMemberModal, setShowMemberModal] = useState(false);
+  const [selectedOrg, setSelectedOrg] = useState(null);
+
+  useEffect(() => {
+    loadUserOrganizations();
+  }, [currentUser]);
+
+  const loadUserOrganizations = async () => {
+    if (!currentUser?.username) return;
+    
+    setIsLoading(true);
+    setError('');
+    
+    try {
+      const response = await organizationService.getUserOrganizations(currentUser.username);
+      if (response.success) {
+        setOrganizations(response.organizations);
+      } else {
+        setError(response.message || 'Failed to load organizations');
+      }
+    } catch (error) {
+      setError(error.message || 'Failed to load organizations');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const createOrganization = async () => {
+    if (!newOrgName.trim()) {
+      setError('Please enter an organization name');
+      return;
+    }
+
+    if (!currentUser?.username) {
+      setError('User information not available');
+      return;
+    }
+
+    setIsLoading(true);
+    setError('');
+    setSuccess('');
+    
+    try {
+      const response = await organizationService.createOrganization(
+        newOrgName.trim(),
+        currentUser.username
+      );
+      
+      if (response.success) {
+        setSuccess('Organization created successfully!');
+        setNewOrgName('');
+        await loadUserOrganizations(); // Reload organizations
+      } else {
+        setError(response.message || 'Failed to create organization');
+      }
+    } catch (error) {
+      setError(error.message || 'Failed to create organization');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const startEdit = (org) => {
+    setEditingOrg(org);
+    setEditOrgName(org.name);
+  };
+
+  const cancelEdit = () => {
+    setEditingOrg(null);
+    setEditOrgName('');
+  };
+
+  const saveEdit = async () => {
+    if (!editOrgName.trim()) {
+      setError('Please enter an organization name');
+      return;
+    }
+
+    setIsLoading(true);
+    setError('');
+    setSuccess('');
+    
+    try {
+      const response = await organizationService.editOrganization(
+        editingOrg._id,
+        editOrgName.trim(),
+        currentUser.username
+      );
+      
+      if (response.success) {
+        setSuccess('Organization updated successfully!');
+        setEditingOrg(null);
+        setEditOrgName('');
+        await loadUserOrganizations(); // Reload organizations
+      } else {
+        setError(response.message || 'Failed to update organization');
+      }
+    } catch (error) {
+      setError(error.message || 'Failed to update organization');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -48,15 +149,64 @@ function OrganizationsPage({ onLogout, onOrganizationSelect }) {
     setConfirmationStep('name');
   };
 
-  const finalDelete = () => {
-    setOrganizations(organizations.filter(org => org.id !== orgToDelete.id));
-    cancelDelete();
+  const finalDelete = async () => {
+    setIsLoading(true);
+    setError('');
+    setSuccess('');
+    
+    try {
+      const response = await organizationService.deleteOrganization(
+        orgToDelete._id,
+        currentUser.username
+      );
+      
+      if (response.success) {
+        setSuccess('Organization deleted successfully!');
+        cancelDelete();
+        await loadUserOrganizations(); // Reload organizations
+      } else {
+        setError(response.message || 'Failed to delete organization');
+      }
+    } catch (error) {
+      setError(error.message || 'Failed to delete organization');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const openMemberModal = (org) => {
+    setSelectedOrg(org);
+    setShowMemberModal(true);
+  };
+
+  const closeMemberModal = () => {
+    setShowMemberModal(false);
+    setSelectedOrg(null);
   };
 
   const handleOrganizationClick = (org) => {
     if (onOrganizationSelect) {
       onOrganizationSelect(org);
     }
+  };
+
+  const clearMessages = () => {
+    setError('');
+    setSuccess('');
+  };
+
+  const isCreator = (org) => {
+    return org.creator && currentUser && org.creator.username === currentUser.username;
+  };
+
+  const formatDate = (dateString) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
   };
 
   return (
@@ -69,9 +219,25 @@ function OrganizationsPage({ onLogout, onOrganizationSelect }) {
           </button>
         )}
       </header>
+      
       <div className="organizations-content">
         <div className="organizations-rectangle">
           <h2>Organizations Management</h2>
+          
+          {/* Message Display */}
+          {error && (
+            <div className="message error-message">
+              {error}
+              <button onClick={clearMessages} className="close-message">×</button>
+            </div>
+          )}
+          {success && (
+            <div className="message success-message">
+              {success}
+              <button onClick={clearMessages} className="close-message">×</button>
+            </div>
+          )}
+
           <div className="organizations-body">
             <div className="create-organization-form">
               <input
@@ -79,30 +245,103 @@ function OrganizationsPage({ onLogout, onOrganizationSelect }) {
                 placeholder="Enter organization name"
                 value={newOrgName}
                 onChange={(e) => setNewOrgName(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && createOrganization()}
+                onKeyDown={(e) => e.key === 'Enter' && createOrganization()}
                 className="org-input"
+                disabled={isLoading}
               />
-              <button onClick={createOrganization} className="create-btn">
-                Create Organization
+              <button 
+                onClick={createOrganization} 
+                className="create-btn"
+                disabled={isLoading}
+              >
+                {isLoading ? 'Creating...' : 'Create Organization'}
               </button>
             </div>
             
-            <div className="organizations-grid">
-              {organizations.map(org => (
-                <div key={org.id} className="organization-item" onClick={() => handleOrganizationClick(org)}>
-                  <div className="organization-name">{org.name}</div>
-                  <button 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      initiateDelete(org);
-                    }}
-                    className="delete-btn"
-                  >
-                    ×
-                  </button>
-                </div>
-              ))}
-            </div>
+            {isLoading && organizations.length === 0 ? (
+              <div className="loading-message">Loading organizations...</div>
+            ) : (
+              <div className="organizations-grid">
+                {organizations.map(org => (
+                  <div key={org._id} className="organization-item">
+                    <div className="organization-header">
+                      {editingOrg && editingOrg._id === org._id ? (
+                        <div className="edit-form">
+                          <input
+                            type="text"
+                            value={editOrgName}
+                            onChange={(e) => setEditOrgName(e.target.value)}
+                            className="edit-input"
+                            onKeyDown={(e) => e.key === 'Enter' && saveEdit()}
+                          />
+                          <div className="edit-actions">
+                            <button onClick={saveEdit} className="save-btn">Save</button>
+                            <button onClick={cancelEdit} className="cancel-btn">Cancel</button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div 
+                          className="organization-name"
+                          onClick={() => handleOrganizationClick(org)}
+                        >
+                          {org.name}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="organization-info">
+                      <div className="org-details">
+                        <p><strong>Creator:</strong> {org.creator?.username || 'Unknown'}</p>
+                        <p><strong>Members:</strong> {org.memberCount || 0}</p>
+                        <p><strong>Programs:</strong> {org.programCount || 0}</p>
+                        <p><strong>Created:</strong> {formatDate(org.createdAt)}</p>
+                      </div>
+
+                      <div className="organization-actions">
+                        {isCreator(org) && (
+                          <>
+                            <button 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                startEdit(org);
+                              }}
+                              className="edit-btn"
+                            >
+                              Edit
+                            </button>
+                            <button 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                initiateDelete(org);
+                              }}
+                              className="delete-btn"
+                              title="Delete Organization"
+                            >
+                              ×
+                            </button>
+                          </>
+                        )}
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openMemberModal(org);
+                          }}
+                          className="members-btn"
+                        >
+                          Manage Members
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                
+                {organizations.length === 0 && !isLoading && (
+                  <div className="no-organizations">
+                    <p>No organizations found. Create your first organization!</p>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -154,12 +393,29 @@ function OrganizationsPage({ onLogout, onOrganizationSelect }) {
                   <button 
                     onClick={finalDelete} 
                     className="modal-confirm-btn"
+                    disabled={isLoading}
                   >
-                    Confirm Delete
+                    {isLoading ? 'Deleting...' : 'Confirm Delete'}
                   </button>
                 </div>
               </>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Member Management Modal */}
+      {showMemberModal && selectedOrg && (
+        <div className="modal-overlay" onClick={closeMemberModal}>
+          <div className="modal-content large-modal" onClick={(e) => e.stopPropagation()}>
+            <MemberManagement
+              organizationId={selectedOrg._id}
+              currentUser={currentUser.username}
+              onClose={() => {
+                closeMemberModal();
+                loadUserOrganizations(); // Reload organizations after closing
+              }}
+            />
           </div>
         </div>
       )}

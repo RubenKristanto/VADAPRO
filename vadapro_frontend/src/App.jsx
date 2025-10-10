@@ -10,21 +10,28 @@ function App() {
   const [isLoading, setIsLoading] = useState(true)
   const [currentView, setCurrentView] = useState('organizations') // 'organizations' or 'programs'
   const [selectedOrganization, setSelectedOrganization] = useState(null)
+  const [currentUser, setCurrentUser] = useState(null)
 
   useEffect(() => {
     // Check if user is already authenticated on app start
     const authenticated = authService.isAuthenticated()
+    if (authenticated) {
+      const user = authService.getCurrentUser()
+      setCurrentUser(user)
+    }
     setIsAuthenticated(authenticated)
     setIsLoading(false)
   }, [])
 
-  const handleLoginSuccess = () => {
+  const handleLoginSuccess = (user) => {
     setIsAuthenticated(true)
+    setCurrentUser(user)
   }
 
   const handleLogout = () => {
     authService.logout()
     setIsAuthenticated(false)
+    setCurrentUser(null)
     setCurrentView('organizations')
     setSelectedOrganization(null)
   }
@@ -50,12 +57,14 @@ function App() {
           <OrganizationsPage 
             onLogout={handleLogout} 
             onOrganizationSelect={handleOrganizationSelect}
+            currentUser={currentUser}
           />
         ) : (
           <ProgramsPage 
             organization={selectedOrganization}
             onBack={handleBackToOrganizations}
             onLogout={handleLogout}
+            currentUser={currentUser}
           />
         )
       ) : (
