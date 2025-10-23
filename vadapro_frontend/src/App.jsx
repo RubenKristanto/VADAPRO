@@ -1,15 +1,18 @@
 import { useState, useEffect } from 'react'
 import LoginPage from './LoginPage.jsx'
-import OrganizationsPage from './OrganizationsPage.jsx'
-import ProgramsPage from './ProgramsPage.jsx'
+import OrganizationPage from './OrganizationPage.jsx'
+import ProgramPage from './ProgramPage.jsx'
+import DataPage from './DataPage.jsx'
 import { authService } from './services/authentication.js'
 import './App.css'
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
-  const [currentView, setCurrentView] = useState('organizations') // 'organizations' or 'programs'
+  const [currentView, setCurrentView] = useState('organizations') // 'organizations', 'programs', or 'data'
   const [selectedOrganization, setSelectedOrganization] = useState(null)
+  const [selectedProgram, setSelectedProgram] = useState(null)
+  const [selectedYear, setSelectedYear] = useState(null)
   const [currentUser, setCurrentUser] = useState(null)
 
   useEffect(() => {
@@ -34,6 +37,8 @@ function App() {
     setCurrentUser(null)
     setCurrentView('organizations')
     setSelectedOrganization(null)
+    setSelectedProgram(null)
+    setSelectedYear(null)
   }
 
   const handleOrganizationSelect = (organization) => {
@@ -44,6 +49,20 @@ function App() {
   const handleBackToOrganizations = () => {
     setCurrentView('organizations')
     setSelectedOrganization(null)
+    setSelectedProgram(null)
+    setSelectedYear(null)
+  }
+
+  const handleYearSelect = (program, year) => {
+    setSelectedProgram(program)
+    setSelectedYear(year)
+    setCurrentView('data')
+  }
+
+  const handleBackToPrograms = () => {
+    setCurrentView('programs')
+    setSelectedProgram(null)
+    setSelectedYear(null)
   }
 
   if (isLoading) {
@@ -54,17 +73,25 @@ function App() {
     <div className="App">
       {isAuthenticated ? (
         currentView === 'organizations' ? (
-          <OrganizationsPage 
+          <OrganizationPage 
             onLogout={handleLogout} 
             onOrganizationSelect={handleOrganizationSelect}
             currentUser={currentUser}
           />
-        ) : (
-          <ProgramsPage 
+        ) : currentView === 'programs' ? (
+          <ProgramPage 
             organization={selectedOrganization}
             onBack={handleBackToOrganizations}
             onLogout={handleLogout}
+            onYearSelect={handleYearSelect}
             currentUser={currentUser}
+          />
+        ) : (
+          <DataPage 
+            program={selectedProgram}
+            year={selectedYear}
+            onBack={handleBackToPrograms}
+            onLogout={handleLogout}
           />
         )
       ) : (

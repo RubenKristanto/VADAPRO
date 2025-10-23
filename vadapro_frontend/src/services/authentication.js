@@ -9,7 +9,9 @@ export const authService = {
       return { message: response.data.message };
     } catch (error) {
       console.log('something wrong with axios');
-      throw new Error(error.response?.data?.message || 'Registration failed');
+      const err = new Error(error.response?.data?.message || 'Registration failed');
+      err.errorType = error.response?.data?.errorType || 'error';
+      throw err;
     }
   },
 
@@ -29,7 +31,9 @@ export const authService = {
         
         return { token, user, message: response.data.message };
       } else {
-        throw new Error(response.data?.message || 'Login failed');
+        const err = new Error(response.data?.message || 'Login failed');
+        err.errorType = response.data?.errorType || 'error';
+        throw err;
       }
     } catch (error) {
       console.error('Authentication error:', error);
@@ -38,13 +42,19 @@ export const authService = {
       if (error.response) {
         // Server responded with error status
         const errorMessage = error.response.data?.message || 'Login failed';
-        throw new Error(errorMessage);
+        const err = new Error(errorMessage);
+        err.errorType = error.response.data?.errorType || 'error';
+        throw err;
       } else if (error.request) {
         // Request was made but no response received
-        throw new Error('Unable to connect to server. Please check if the server is running.');
+        const err = new Error('Unable to connect to server. Please check if the server is running.');
+        err.errorType = 'connection';
+        throw err;
       } else {
         // Something else happened
-        throw new Error(error.message || 'Login failed');
+        const err = new Error(error.message || 'Login failed');
+        err.errorType = 'error';
+        throw err;
       }
     }
   },
