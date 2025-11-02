@@ -1,21 +1,51 @@
 import axiosAPI from '../utils/axiosConfig.js';
 
 export const authService = {
+  // Register function
+  async register(credentials) {
+    try {
+      console.log('calling axios API');
+      const response = await axiosAPI.post('/auth/register', credentials);
+      return { message: response.data.message };
+    } catch (error) {
+      console.log('something wrong with axios');
+      throw new Error(error.response?.data?.message || 'Registration failed');
+    }
+  },
+
   // Login function
   async login(credentials) {
     try {
+      console.log(credentials);
       const response = await axiosAPI.post('/auth/login', credentials);
+      
       // Check if the response indicates success
-      if (response.data.message === 'Login successful') {
-        const token = 'demo-token';
-        const user = { username: credentials.username };
+      if (response.status === 200 && response.data) {
+        const token = response.data.token || 'demo-token';
+        const user = response.data.user || { username: credentials.username };
+        
         localStorage.setItem('authToken', token);
         localStorage.setItem('user', JSON.stringify(user));
+        
         return { token, user, message: response.data.message };
+      } else {
+        throw new Error(response.data?.message || 'Login failed');
       }
-      throw new Error(response.data.message || 'Login failed');
     } catch (error) {
-      throw new Error(error.response?.data?.message || 'Login failed');
+      console.error('Authentication error:', error);
+      
+      // Handle different error types
+      if (error.response) {
+        // Server responded with error status
+        const errorMessage = error.response.data?.message || 'Login failed';
+        throw new Error(errorMessage);
+      } else if (error.request) {
+        // Request was made but no response received
+        throw new Error('Unable to connect to server. Please check if the server is running.');
+      } else {
+        // Something else happened
+        throw new Error(error.message || 'Login failed');
+      }
     }
   },
 

@@ -18,23 +18,10 @@ function LoginPage({ onLoginSuccess }) {
     setIsLoading(true);
     setMessage('');
     try {
-      // For registration, we'll still use axios directly since authService doesn't have register
-      const res = await fetch('http://localhost:3001/auth/register', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ username, password }),
-      });
-      const data = await res.json();
-      
-      if (res.ok) {
-        setMessage(data.message);
-      } else {
-        setMessage(data.message || 'Registration failed');
-      }
+      const result = await authService.register({ username, password });
+      setMessage(result.message);
     } catch (err) {
-      setMessage('Registration failed');
+      setMessage(err.message || 'Registration failed');
     } finally {
       setIsLoading(false);
     }
@@ -49,15 +36,24 @@ function LoginPage({ onLoginSuccess }) {
     setIsLoading(true);
     setMessage('');
     try {
+      console.log('Attempting login with:', { username, password });
       const result = await authService.login({ username, password });
-      setMessage(result.message);
       
-      // If login is successful, call the success callback
-      if (result.token && onLoginSuccess) {
-        onLoginSuccess();
+      // If login is successful, call the success callback immediately
+      if (result && result.token) {
+        console.log('login success');
+        // Small delay to show success message before transition
+        setTimeout(() => {
+          if (onLoginSuccess) {
+            onLoginSuccess(result.user);
+          }
+        }, 500);
+      } else {
+        console.log('login failed');
       }
       
     } catch (err) {
+      console.error('Login error:', err);
       setMessage(err.message || 'Login failed');
     } finally {
       setIsLoading(false);
@@ -72,7 +68,7 @@ function LoginPage({ onLoginSuccess }) {
       <div className="login-content">
         <div className="login-rectangle">
           <h2>Welcome Back</h2>
-          <form onSubmit={handleLogin} autoComplete="off">
+          <form autoComplete="off">
             <div className="input-group">
               <label htmlFor="username">Username</label>
               <input
@@ -123,7 +119,8 @@ function LoginPage({ onLoginSuccess }) {
             {message && <p className="login-message">{message}</p>}
 
             <button
-              type="submit"
+              type="button"
+              onClick={handleLogin}
               className="login-button"
               disabled={isLoading || !username || !password}
             >
