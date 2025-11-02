@@ -2,7 +2,7 @@ import { useState } from 'react';
 import axios from 'axios';
 import './ProgramPage.css';
 
-function ProgramsPage({ organization, onBack, onLogout }) {
+function ProgramsPage({ organization, onBack, onLogout, onYearSelect }) {
   const [programs, setPrograms] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [newProgramName, setNewProgramName] = useState('');
@@ -12,17 +12,65 @@ function ProgramsPage({ organization, onBack, onLogout }) {
   const [programToDelete, setProgramToDelete] = useState(null);
   const [deleteConfirmName, setDeleteConfirmName] = useState('');
   const [confirmationStep, setConfirmationStep] = useState('name'); // 'name' or 'final'
+  
+  // Year instance states
+  const [showYearModal, setShowYearModal] = useState(false);
+  const [currentProgramForYear, setCurrentProgramForYear] = useState(null);
+  const [newYear, setNewYear] = useState('');
 
   const createProgram = () => {
     if (newProgramName.trim()) {
       const newProgram = {
         id: Date.now(), // Simple ID generation
         name: newProgramName.trim(),
-        organizationId: organization.id
+        organizationId: organization.id,
+        years: [] // Initialize empty years array
       };
       setPrograms([...programs, newProgram]);
       setNewProgramName('');
     }
+  };
+
+  const openYearModal = (program) => {
+    setCurrentProgramForYear(program);
+    setShowYearModal(true);
+    setNewYear('');
+  };
+
+  const closeYearModal = () => {
+    setShowYearModal(false);
+    setCurrentProgramForYear(null);
+    setNewYear('');
+  };
+
+  const addYear = () => {
+    if (newYear.trim() && currentProgramForYear) {
+      const updatedPrograms = programs.map(program => {
+        if (program.id === currentProgramForYear.id) {
+          return {
+            ...program,
+            years: [...(program.years || []), { id: Date.now(), year: newYear.trim() }]
+          };
+        }
+        return program;
+      });
+      setPrograms(updatedPrograms);
+      closeYearModal();
+    }
+  };
+
+  const deleteYear = (programId, yearId, e) => {
+    e.stopPropagation();
+    const updatedPrograms = programs.map(program => {
+      if (program.id === programId) {
+        return {
+          ...program,
+          years: program.years.filter(year => year.id !== yearId)
+        };
+      }
+      return program;
+    });
+    setPrograms(updatedPrograms);
   };
 
   const initiateDelete = (program) => {
@@ -81,7 +129,7 @@ function ProgramsPage({ organization, onBack, onLogout }) {
                 placeholder="Enter program name"
                 value={newProgramName}
                 onChange={(e) => setNewProgramName(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && createProgram()}
+                onKeyDown={(e) => e.key === 'Enter' && createProgram()}
                 className="program-input"
               />
               <button onClick={createProgram} className="create-btn">
@@ -92,16 +140,62 @@ function ProgramsPage({ organization, onBack, onLogout }) {
             <div className="programs-grid">
               {programs.map(program => (
                 <div key={program.id} className="program-item">
-                  <div className="program-name">{program.name}</div>
-                  <button 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      initiateDelete(program);
-                    }}
-                    className="delete-btn"
-                  >
-                    ×
-                  </button>
+                  <div className="program-content">
+                    <div className="program-header">
+                      <div className="program-name">{program.name}</div>
+                      <div className="program-actions">
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            initiateDelete(program);
+                          }}
+                          className="delete-btn"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    </div>
+                    <div className="add-year-container">
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openYearModal(program);
+                        }}
+                        className="add-year-btn"
+                        title="Add Year Instance"
+                      >
+                        + Year
+                      </button>
+                    </div>
+                    {program.years && program.years.length > 0 && (
+                      <div className="years-container">
+                        <div className="years-scroll">
+                          {program.years.map(year => (
+                            <div 
+                              key={year.id} 
+                              className="year-item"
+                              onClick={(e) => {
+                                // Only navigate if not clicking delete button
+                                if (!e.target.classList.contains('year-delete-btn')) {
+                                  onYearSelect && onYearSelect(program, year.year);
+                                }
+                              }}
+                              style={{ cursor: 'pointer' }}
+                            >
+                              <span className="year-text">{year.year}</span>
+                              <button 
+                                onClick={(e) => deleteYear(program.id, year.id, e)}
+                                className="year-delete-btn"
+                                title="Delete Year"
+                              >
+                                ×
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
@@ -162,6 +256,39 @@ function ProgramsPage({ organization, onBack, onLogout }) {
                 </div>
               </>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Add Year Modal */}
+      {showYearModal && (
+        <div className="modal-overlay" onClick={closeYearModal}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <h3 className="modal-title">Add Year Instance</h3>
+            <p className="modal-description">
+              Add a year instance for "<strong>{currentProgramForYear?.name}</strong>"
+            </p>
+            <input
+              type="text"
+              placeholder="Enter year (e.g., 2024)"
+              value={newYear}
+              onChange={(e) => setNewYear(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && addYear()}
+              className="modal-input"
+              autoFocus
+            />
+            <div className="modal-actions">
+              <button onClick={closeYearModal} className="modal-cancel-btn">
+                Cancel
+              </button>
+              <button 
+                onClick={addYear} 
+                className="modal-confirm-btn"
+                disabled={!newYear.trim()}
+              >
+                Add Year
+              </button>
+            </div>
           </div>
         </div>
       )}

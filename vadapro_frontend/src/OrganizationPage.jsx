@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import './OrganizationsPage.css';
+import './OrganizationPage.css';
 import organizationService from './services/organizationService';
 import MemberManagement from './components/MemberManagement';
 

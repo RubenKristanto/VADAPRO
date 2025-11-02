@@ -8,20 +8,25 @@ function LoginPage({ onLoginSuccess }) {
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [message, setMessage] = useState(''); // <-- Renamed state for consistency
+  const [errorType, setErrorType] = useState(''); // Track error type for styling
 
   const handleRegister = async (e) => {
     e.preventDefault();
     if (!username || !password) {
       setMessage('Please enter both username and password');
+      setErrorType('validation');
       return;
     }
     setIsLoading(true);
     setMessage('');
+    setErrorType('');
     try {
       const result = await authService.register({ username, password });
       setMessage(result.message);
+      setErrorType('success');
     } catch (err) {
       setMessage(err.message || 'Registration failed');
+      setErrorType(err.errorType || 'error');
     } finally {
       setIsLoading(false);
     }
@@ -31,10 +36,12 @@ function LoginPage({ onLoginSuccess }) {
     e.preventDefault();
     if (!username || !password) {
       setMessage('Please enter both username and password');
+      setErrorType('validation');
       return;
     }
     setIsLoading(true);
     setMessage('');
+    setErrorType('');
     try {
       console.log('Attempting login with:', { username, password });
       const result = await authService.login({ username, password });
@@ -55,6 +62,7 @@ function LoginPage({ onLoginSuccess }) {
     } catch (err) {
       console.error('Login error:', err);
       setMessage(err.message || 'Login failed');
+      setErrorType(err.errorType || 'error');
     } finally {
       setIsLoading(false);
     }
@@ -116,7 +124,11 @@ function LoginPage({ onLoginSuccess }) {
             </div>
             
             {/* Area to display feedback messages to the user */}
-            {message && <p className="login-message">{message}</p>}
+            {message && (
+              <p className={`login-message ${errorType === 'success' ? 'success' : 'error'}`}>
+                {message}
+              </p>
+            )}
 
             <button
               type="button"
@@ -138,7 +150,6 @@ function LoginPage({ onLoginSuccess }) {
             </button>
             
           </form>
-          <p className="create-account-link"> Don't have an account? <a href="/register">Create account</a> </p>
         </div>
       </div>
     </div>
