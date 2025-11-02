@@ -275,6 +275,7 @@
   flex: 1 !important;
   display: flex !important;
   align-items: center !important;
+  gap: 0.75rem !important;
 }
 
 .entry-name {
@@ -425,6 +426,34 @@
   font-size: 1rem !important;
 }
 
+/* Process button row - below source section */
+.process-button-row {
+  display: flex !important;
+  justify-content: flex-start !important;
+  margin-top: 1rem !important;
+  padding-top: 1rem !important;
+  border-top: 1px solid var(--border-color) !important;
+}
+
+.process-btn-large {
+  background: var(--success-color) !important;
+  color: white !important;
+  padding: 0.75rem 2rem !important;
+  font-size: 1rem !important;
+}
+
+.process-btn-large:hover:not(:disabled) {
+  background: #059669 !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 2px 6px rgba(16, 185, 129, 0.3) !important;
+}
+
+.process-btn-large:disabled {
+  background: #d1d5db !important;
+  cursor: not-allowed !important;
+  opacity: 0.5 !important;
+}
+
 /* Modal styles - matching ProgramPage */
 .modal-overlay {
   position: fixed !important;
@@ -560,6 +589,16 @@
 .modal-add-btn:enabled:hover {
   background: var(--primary-hover) !important;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* Special styling for the Process button in modal */
+.modal-process-btn {
+  background: var(--success-color) !important;
+}
+
+.modal-process-btn:enabled:hover {
+  background: #059669 !important;
+  box-shadow: 0 4px 8px rgba(16, 185, 129, 0.3) !important;
 }
 
 /* Responsive adjustments */

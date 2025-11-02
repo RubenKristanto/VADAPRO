@@ -6,6 +6,7 @@ const authRoutes = require('./routes/auth');
 const orgRoutes = require('./routes/org');
 const programRoutes = require('./routes/programs');
 const membershipRoutes = require('./routes/membership');
+const processRoutes = require('./routes/process');
 const mongoose = require('mongoose');
 
 const app = express();
@@ -16,6 +17,7 @@ app.use('/auth', authRoutes); // Authentication routes
 app.use('/org', orgRoutes);   // Organization routes
 app.use('/programs', programRoutes); // Program routes
 app.use('/membership', membershipRoutes); // Membership routes
+app.use('/process', processRoutes); // Process routes
 
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {

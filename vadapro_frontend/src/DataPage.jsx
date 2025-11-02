@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import './DataPage.css';
 
-function DataPage({ program, year, onBack, onLogout }) {
+function DataPage({ program, year, onBack, onLogout, onNavigateToProcess }) {
   const [entries, setEntries] = useState([]);
   const [expandedEntries, setExpandedEntries] = useState(new Set());
   const [showAddModal, setShowAddModal] = useState(false);
@@ -12,6 +12,10 @@ function DataPage({ program, year, onBack, onLogout }) {
   const [entryToDelete, setEntryToDelete] = useState(null);
   const [deleteConfirmName, setDeleteConfirmName] = useState('');
   const [confirmationStep, setConfirmationStep] = useState('name');
+  
+  // Process confirmation states
+  const [showProcessModal, setShowProcessModal] = useState(false);
+  const [entryToProcess, setEntryToProcess] = useState(null);
 
   const openAddModal = () => {
     setShowAddModal(true);
@@ -94,10 +98,22 @@ function DataPage({ program, year, onBack, onLogout }) {
     }
   };
 
-  const handleProcess = (entryId, e) => {
+  const openProcessModal = (entry, e) => {
     e.stopPropagation();
-    // TODO: Implement process logic
-    console.log('Processing entry:', entryId);
+    setEntryToProcess(entry);
+    setShowProcessModal(true);
+  };
+
+  const closeProcessModal = () => {
+    setShowProcessModal(false);
+    setEntryToProcess(null);
+  };
+
+  const startProcess = () => {
+    if (onNavigateToProcess) {
+      onNavigateToProcess(entryToProcess);
+    }
+    closeProcessModal();
   };
 
   return (
@@ -142,6 +158,9 @@ function DataPage({ program, year, onBack, onLogout }) {
                       onClick={() => toggleEntry(entry.id)}
                     >
                       <div className="entry-header-left">
+                        <span className="expand-icon">
+                          {expandedEntries.has(entry.id) ? '▼' : '▶'}
+                        </span>
                         <span className="entry-name">{entry.name}</span>
                       </div>
                       <div className="entry-header-right">
@@ -152,9 +171,6 @@ function DataPage({ program, year, onBack, onLogout }) {
                         >
                           ×
                         </button>
-                        <span className="expand-icon">
-                          {expandedEntries.has(entry.id) ? '▼' : '▶'}
-                        </span>
                       </div>
                     </div>
                     
@@ -183,18 +199,20 @@ function DataPage({ program, year, onBack, onLogout }) {
                                 Upload
                               </button>
                             </label>
-                            <button 
-                              className="action-btn process-btn"
-                              onClick={(e) => handleProcess(entry.id, e)}
-                              disabled={!entry.sourceFile}
-                            >
-                              Process
-                            </button>
                           </div>
                           <div className="response-section">
                             <span className="info-label">Response:</span>
                             <span className="response-count">{entry.responseCount}</span>
                           </div>
+                        </div>
+                        <div className="process-button-row">
+                          <button 
+                            className="action-btn process-btn-large"
+                            onClick={(e) => openProcessModal(entry, e)}
+                            disabled={!entry.sourceFile}
+                          >
+                            Process
+                          </button>
                         </div>
                       </div>
                     )}
@@ -292,6 +310,31 @@ function DataPage({ program, year, onBack, onLogout }) {
                 </div>
               </>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Process Confirmation Modal */}
+      {showProcessModal && (
+        <div className="modal-overlay" onClick={closeProcessModal}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <h3 className="modal-title">Process Data</h3>
+            <p className="modal-description">
+              You are about to process "<strong>{entryToProcess?.name}</strong>".
+              <br />
+              Click "Start Process" to continue to the processing page.
+            </p>
+            <div className="modal-actions">
+              <button onClick={closeProcessModal} className="modal-cancel-btn">
+                Cancel
+              </button>
+              <button 
+                onClick={startProcess} 
+                className="modal-confirm-btn modal-process-btn"
+              >
+                Start Process
+              </button>
+            </div>
           </div>
         </div>
       )}
