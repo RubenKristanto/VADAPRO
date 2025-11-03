@@ -3,31 +3,6 @@ const Organization = require('../models/organizationModel');
 const User = require('../models/userModel');
 const Membership = require('../models/membershipModel');
 const mongoose = require('mongoose');
-const multer = require('multer');
-const { Readable } = require('stream');
-
-// We'll parse uploads into memory and write them into GridFS
-const memoryStorage = multer.memoryStorage();
-const uploadDatasheet = multer({ storage: memoryStorage });
-const uploadImage = multer({ storage: memoryStorage });
-
-// Helper: upload a buffer to MongoDB GridFS and return the file document
-const uploadBufferToGridFS = (buffer, filename, options = {}) => {
-    return new Promise((resolve, reject) => {
-        try {
-            const bucket = new mongoose.mongo.GridFSBucket(mongoose.connection.db, { bucketName: 'uploads' });
-            const uploadStream = bucket.openUploadStream(filename, { metadata: options });
-            const readable = new Readable();
-            readable.push(buffer);
-            readable.push(null);
-            readable.pipe(uploadStream)
-                .on('error', (err) => reject(err))
-                .on('finish', (file) => resolve(file));
-        } catch (err) {
-            reject(err);
-        }
-    });
-};
 
 // Create a new program
 exports.createProgram = async (req, res) => {
@@ -520,72 +495,3 @@ exports.deleteProgram = async (req, res) => {
         });
     }
 };
-
-// Upload datasheets (multiple files) -> store in GridFS
-exports.uploadDatasheets = [
-    uploadDatasheet.array('datasheets', 10),
-    async (req, res) => {
-        try {
-            const { id } = req.params;
-            if (!mongoose.Types.ObjectId.isValid(id)) {
-                return res.status(400).json({ success: false, message: 'Invalid program ID' });
-            }
-            const program = await Program.findById(id);
-            if (!program) return res.status(404).json({ success: false, message: 'Program not found' });
-
-            if (!req.files || req.files.length === 0) {
-                return res.status(400).json({ success: false, message: 'No files uploaded' });
-            }
-
-            const additions = [];
-            for (const f of req.files) {
-                // upload buffer to GridFS
-                const fileDoc = await uploadBufferToGridFS(f.buffer, f.originalname, { originalname: f.originalname, contentType: f.mimetype, programId: id, fieldname: f.fieldname, kind: 'datasheet' });
-                const add = { filename: fileDoc.filename, originalname: f.originalname, url: `/files/${fileDoc._id}`, uploadedAt: new Date(), gridFsId: fileDoc._id.toString() };
-                additions.push(add);
-            }
-
-            program.datasheets = program.datasheets.concat(additions);
-            await program.save();
-
-            res.status(200).json({ success: true, message: 'Datasheets uploaded', files: additions });
-        } catch (err) {
-            console.error('Error uploading datasheets:', err);
-            res.status(500).json({ success: false, message: 'Server error', error: err.message });
-        }
-    }
-];
-
-// Upload images (multiple files) -> store in GridFS
-exports.uploadImages = [
-    uploadImage.array('images', 20),
-    async (req, res) => {
-        try {
-            const { id } = req.params;
-            if (!mongoose.Types.ObjectId.isValid(id)) {
-                return res.status(400).json({ success: false, message: 'Invalid program ID' });
-            }
-            const program = await Program.findById(id);
-            if (!program) return res.status(404).json({ success: false, message: 'Program not found' });
-
-            if (!req.files || req.files.length === 0) {
-                return res.status(400).json({ success: false, message: 'No images uploaded' });
-            }
-
-            const additions = [];
-            for (const f of req.files) {
-                const fileDoc = await uploadBufferToGridFS(f.buffer, f.originalname, { originalname: f.originalname, contentType: f.mimetype, programId: id, fieldname: f.fieldname, kind: 'image' });
-                const add = { filename: fileDoc.filename, originalname: f.originalname, url: `/files/${fileDoc._id}`, uploadedAt: new Date(), gridFsId: fileDoc._id.toString() };
-                additions.push(add);
-            }
-
-            program.images = program.images.concat(additions);
-            await program.save();
-
-            res.status(200).json({ success: true, message: 'Images uploaded', files: additions });
-        } catch (err) {
-            console.error('Error uploading images:', err);
-            res.status(500).json({ success: false, message: 'Server error', error: err.message });
-        }
-    }
-];

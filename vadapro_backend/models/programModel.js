@@ -27,33 +27,6 @@ const programSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId, 
         ref: 'User' 
     }],
-    // Files (data sheets) associated with the program
-    datasheets: [
-        {
-            filename: { type: String },
-            originalname: { type: String },
-            url: { type: String },
-            gridFsId: { type: String },
-            uploadedAt: { type: Date, default: Date.now }
-        }
-    ],
-    // Images associated with the program
-    images: [
-        {
-            filename: { type: String },
-            originalname: { type: String },
-            url: { type: String },
-            gridFsId: { type: String },
-            uploadedAt: { type: Date, default: Date.now }
-        }
-    ],
-    // Work years associated with this program (one program can have multiple years)
-    workYears: [
-        {
-            type: mongoose.Schema.Types.ObjectId,
-            ref: 'WorkYear'
-        }
-    ],
     startDate: { 
         type: Date,
         default: Date.now
