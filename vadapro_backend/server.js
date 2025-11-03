@@ -7,6 +7,8 @@ const orgRoutes = require('./routes/org');
 const programRoutes = require('./routes/programs');
 const membershipRoutes = require('./routes/membership');
 const processRoutes = require('./routes/process');
+const workYearRoutes = require('./routes/workyears');
+const path = require('path');
 const mongoose = require('mongoose');
 
 const app = express();
@@ -18,6 +20,10 @@ app.use('/org', orgRoutes);   // Organization routes
 app.use('/programs', programRoutes); // Program routes
 app.use('/membership', membershipRoutes); // Membership routes
 app.use('/process', processRoutes); // Process routes
+app.use('/workyears', workYearRoutes); // WorkYear routes
+
+// Serve uploaded files
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {

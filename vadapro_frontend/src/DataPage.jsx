@@ -1,11 +1,14 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import './DataPage.css';
+import workYearService from './services/workYearService';
 
 function DataPage({ program, year, onBack, onLogout, onNavigateToProcess }) {
   const [entries, setEntries] = useState([]);
   const [expandedEntries, setExpandedEntries] = useState(new Set());
   const [showAddModal, setShowAddModal] = useState(false);
   const [newEntryName, setNewEntryName] = useState('');
+  const [workYearData, setWorkYearData] = useState(null);
+  // file inputs removed - uploads are handled per-entry via the entry upload button
   
   // Delete confirmation states
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -22,22 +25,82 @@ function DataPage({ program, year, onBack, onLogout, onNavigateToProcess }) {
     setNewEntryName('');
   };
 
+  useEffect(() => {
+    const loadWorkYear = async () => {
+      if (!program || !year) return;
+      try {
+        const resp = await workYearService.getProgramWorkYears(program._id);
+        if (resp.success) {
+              const found = (resp.workYears || []).find(w => w.year === parseInt(year, 10));
+              if (found) {
+                const single = await workYearService.getWorkYearById(found._id);
+                if (single.success) {
+                  setWorkYearData(single.workYear);
+                  // set entries from persisted workYear
+                  setEntries(mapEntriesFromWorkYear(single.workYear));
+                } else setWorkYearData(null);
+              } else {
+                setWorkYearData(null);
+                setEntries([]);
+              }
+        }
+      } catch (err) {
+        console.error('Failed to load workYear data', err);
+      }
+    };
+    loadWorkYear();
+  }, [program, year]);
+
   const closeAddModal = () => {
     setShowAddModal(false);
     setNewEntryName('');
   };
 
+  // Map entries from workYear document to UI entries
+  const mapEntriesFromWorkYear = (wy) => {
+    if (!wy) return [];
+    return (wy.entries || []).map(e => ({
+      id: e._id,
+      name: e.name,
+      sourceFile: e.sourceFile || null,
+      responseCount: e.responseCount || 0,
+      persisted: true
+    }));
+  };
+
   const addEntry = () => {
-    if (newEntryName.trim()) {
-      const newEntry = {
-        id: Date.now(),
-        name: newEntryName.trim(),
-        sourceFile: null,
-        responseCount: 0
-      };
-      setEntries([...entries, newEntry]);
-      closeAddModal();
-    }
+    if (!newEntryName.trim()) return;
+
+    // If a workYear exists, create entry on the server so it persists
+    (async () => {
+      try {
+        if (workYearData && workYearData._id) {
+          const resp = await workYearService.createEntry(workYearData._id, newEntryName.trim());
+          if (resp && resp.success) {
+            const wy = resp.workYear;
+            setWorkYearData(wy);
+            setEntries(mapEntriesFromWorkYear(wy));
+            closeAddModal();
+            return;
+          }
+          alert(resp.message || 'Failed to create entry');
+        } else {
+          // No workYear selected - fallback to local entry (not persisted)
+          const newEntry = {
+            id: Date.now(),
+            name: newEntryName.trim(),
+            sourceFile: null,
+            responseCount: 0,
+            persisted: false
+          };
+          setEntries([...entries, newEntry]);
+          closeAddModal();
+        }
+      } catch (err) {
+        console.error('Error creating entry', err);
+        alert('Failed to create entry');
+      }
+    })();
   };
 
   const toggleEntry = (entryId) => {
@@ -83,20 +146,52 @@ function DataPage({ program, year, onBack, onLogout, onNavigateToProcess }) {
   const handleFileUpload = (entryId, e) => {
     e.stopPropagation();
     const file = e.target.files[0];
-    if (file) {
-      const updatedEntries = entries.map(entry => {
-        if (entry.id === entryId) {
-          return {
-            ...entry,
-            sourceFile: file.name,
-            responseCount: Math.floor(Math.random() * 100) + 1 // Temporary random count
-          };
+    if (!file) return;
+
+    // If a workYear is selected on this page, upload the file to the backend and refresh workYear data
+    (async () => {
+      try {
+        if (workYearData && workYearData._id) {
+          // Call backend upload endpoint
+          const resp = await workYearService.uploadDatasheets(workYearData._id, [file]);
+          if (resp && resp.success) {
+            // Refresh workYear data from server
+            const single = await workYearService.getWorkYearById(workYearData._id);
+            if (single && single.success) {
+              setWorkYearData(single.workYear);
+              setEntries(mapEntriesFromWorkYear(single.workYear));
+            }
+
+            // Update the entry's sourceFile to the uploaded file name (use returned metadata if available)
+            const uploadedName = (resp.files && resp.files.length > 0 && (resp.files[0].originalName || resp.files[0].originalname || resp.files[0].filename)) || file.name;
+            const updatedEntries = entries.map(entry => entry.id === entryId ? { ...entry, sourceFile: uploadedName, responseCount: Math.max(entry.responseCount, 1) } : entry);
+            setEntries(updatedEntries);
+            return;
+          }
+          // If server returned non-success, fall back to local update and notify user
+          alert(resp.message || 'Upload failed');
+        } else {
+          // No workYear selected: update locally (offline mode)
+          const updatedEntries = entries.map(entry => {
+            if (entry.id === entryId) {
+              return {
+                ...entry,
+                sourceFile: file.name,
+                responseCount: Math.floor(Math.random() * 100) + 1 // Temporary random count
+              };
+            }
+            return entry;
+          });
+          setEntries(updatedEntries);
         }
-        return entry;
-      });
-      setEntries(updatedEntries);
-    }
+      } catch (err) {
+        console.error('File upload error', err);
+        alert('Upload failed — check console for details');
+      }
+    })();
   };
+
+  // datasheet/image upload handlers removed; file uploads happen per data entry
 
   const openProcessModal = (entry, e) => {
     e.stopPropagation();
@@ -136,7 +231,6 @@ function DataPage({ program, year, onBack, onLogout, onNavigateToProcess }) {
       <div className="data-content">
         <div className="data-rectangle">
           <h2>Data Management</h2>
-          
           {/* Add Data Entry Button - at top center but below title */}
           <div className="add-entry-container">
             <button onClick={openAddModal} className="add-entry-btn">
@@ -167,7 +261,8 @@ function DataPage({ program, year, onBack, onLogout, onNavigateToProcess }) {
                         <button 
                           onClick={(e) => initiateDelete(entry, e)}
                           className="delete-entry-btn"
-                          title="Delete Entry"
+                          title={entry.persisted ? 'Cannot delete persisted entry' : 'Delete Entry'}
+                          disabled={entry.persisted}
                         >
                           ×
                         </button>

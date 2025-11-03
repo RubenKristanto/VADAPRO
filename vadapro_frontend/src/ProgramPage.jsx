@@ -1,11 +1,44 @@
-import { useState } from 'react';
-import axios from 'axios';
+import { useState, useEffect } from 'react';
 import './ProgramPage.css';
+import programService from './services/programService';
+import workYearService from './services/workYearService';
+import { authService } from './services/authentication';
 
 function ProgramsPage({ organization, onBack, onLogout, onYearSelect }) {
   const [programs, setPrograms] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [newProgramName, setNewProgramName] = useState('');
+  const [yearError, setYearError] = useState('');
+
+  useEffect(() => {
+    if (organization && organization._id) loadPrograms();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [organization]);
+
+  const loadPrograms = async () => {
+    if (!organization || !organization._id) return;
+    setIsLoading(true);
+    try {
+      const resp = await programService.getOrganizationPrograms(organization._id);
+      if (resp.success) {
+        const progs = resp.programs || [];
+        const withYears = await Promise.all(progs.map(async p => {
+          try {
+            const wy = await workYearService.getProgramWorkYears(p._id);
+            return { ...p, years: (wy.workYears || []).map(w => ({ id: w._id, year: w.year })) };
+          } catch (e) {
+            return { ...p, years: [] };
+          }
+        }));
+  // Normalize: add `id` field (used by existing UI) mapped from Mongo `_id`
+  setPrograms(withYears.map(p => ({ ...p, id: p._id })));
+      }
+    } catch (err) {
+      console.error('Failed loading programs', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
   
   // Deletion confirmation states
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -18,16 +51,28 @@ function ProgramsPage({ organization, onBack, onLogout, onYearSelect }) {
   const [currentProgramForYear, setCurrentProgramForYear] = useState(null);
   const [newYear, setNewYear] = useState('');
 
-  const createProgram = () => {
-    if (newProgramName.trim()) {
-      const newProgram = {
-        id: Date.now(), // Simple ID generation
-        name: newProgramName.trim(),
-        organizationId: organization.id,
-        years: [] // Initialize empty years array
-      };
-      setPrograms([...programs, newProgram]);
-      setNewProgramName('');
+  const createProgram = async () => {
+    if (!newProgramName.trim()) return;
+    if (!authService.getCurrentUser()) return alert('User not available');
+    setIsLoading(true);
+    try {
+      const resp = await programService.createProgram(
+        newProgramName.trim(),
+        '',
+        organization._id,
+        authService.getCurrentUser().username
+      );
+      if (resp.success) {
+        setNewProgramName('');
+        await loadPrograms();
+      } else {
+        alert(resp.message || 'Failed to create program');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Failed to create program');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -43,26 +88,41 @@ function ProgramsPage({ organization, onBack, onLogout, onYearSelect }) {
     setNewYear('');
   };
 
-  const addYear = () => {
-    if (newYear.trim() && currentProgramForYear) {
-      const updatedPrograms = programs.map(program => {
-        if (program.id === currentProgramForYear.id) {
-          return {
-            ...program,
-            years: [...(program.years || []), { id: Date.now(), year: newYear.trim() }]
-          };
-        }
-        return program;
-      });
-      setPrograms(updatedPrograms);
-      closeYearModal();
+  const addYear = async () => {
+    setYearError('');
+    if (!newYear.trim() || !currentProgramForYear) return;
+    if (!authService.getCurrentUser()) return alert('User not available');
+    setIsLoading(true);
+    try {
+      const resp = await workYearService.createWorkYear(currentProgramForYear._id, parseInt(newYear.trim(), 10), authService.getCurrentUser().username);
+      if (resp.success) {
+        const updatedPrograms = programs.map(p => {
+          if (p._id === currentProgramForYear._id) {
+            return { ...p, years: [...(p.years || []), { id: resp.workYear._id, year: resp.workYear.year }] };
+          }
+          return p;
+        });
+        setPrograms(updatedPrograms);
+        closeYearModal();
+      } else {
+        setYearError(resp.message || 'Failed to create year');
+      }
+    } catch (err) {
+      console.error('create year err', err);
+      setYearError(err.message || 'Failed to create year');
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const deleteYear = (programId, yearId, e) => {
     e.stopPropagation();
+    const isPersisted = typeof yearId === 'string' && yearId.length === 24;
+    if (isPersisted) {
+      return alert('Deleting persisted work years is not supported in this UI.');
+    }
     const updatedPrograms = programs.map(program => {
-      if (program.id === programId) {
+      if (program._id === programId) {
         return {
           ...program,
           years: program.years.filter(year => year.id !== yearId)
@@ -167,7 +227,7 @@ function ProgramsPage({ organization, onBack, onLogout, onYearSelect }) {
                         + Year
                       </button>
                     </div>
-                    {program.years && program.years.length > 0 && (
+                          {program.years && program.years.length > 0 && (
                       <div className="years-container">
                         <div className="years-scroll">
                           {program.years.map(year => (
@@ -184,7 +244,7 @@ function ProgramsPage({ organization, onBack, onLogout, onYearSelect }) {
                             >
                               <span className="year-text">{year.year}</span>
                               <button 
-                                onClick={(e) => deleteYear(program.id, year.id, e)}
+                                onClick={(e) => deleteYear(program._id, year.id, e)}
                                 className="year-delete-btn"
                                 title="Delete Year"
                               >
