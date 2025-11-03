@@ -40,7 +40,7 @@ vadapro_backend/
 
 2. **Install dependencies**
 	```
-	npm install express mongoose bcryptjs body-parser cors dotenv
+	npm install express mongoose bcryptjs body-parser cors dotenv multer
 	```
 
 3. **Create .env file**
@@ -69,6 +69,18 @@ vadapro_backend/
 	```
 	node server.js
 	```
+
+10. **File uploads**
+- The backend supports uploading datasheets and images for programs and work years. Endpoints:
+	- POST /programs/:id/datasheets (field name: datasheets) - accepts multiple files
+	- POST /programs/:id/images (field name: images) - accepts multiple files
+	- POST /workyears/:id/datasheets (field name: datasheets) - accepts multiple files
+	- POST /workyears/:id/images (field name: images) - accepts multiple files
+
+	Files are stored in MongoDB using GridFS (Atlas if your MONGO_URI points to Atlas). The API exposes file downloads at `/files/:id` — stored documents (programs/workYears) keep metadata with `url` values pointing to `/files/<fileId>`.
+
+11. **Notes**
+- If you use MongoDB Atlas, set `MONGO_URI` in `.env` to your Atlas connection string (including db name). Ensure network access is allowed for your IP or set to allow access from anywhere during development.
 
 ## Usage
 

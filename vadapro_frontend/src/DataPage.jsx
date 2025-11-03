@@ -1,11 +1,15 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import './DataPage.css';
+import workYearService from './services/workYearService';
 
 function DataPage({ program, year, onBack, onLogout }) {
   const [entries, setEntries] = useState([]);
   const [expandedEntries, setExpandedEntries] = useState(new Set());
   const [showAddModal, setShowAddModal] = useState(false);
   const [newEntryName, setNewEntryName] = useState('');
+  const [workYearData, setWorkYearData] = useState(null);
+  const datasheetInputRef = useRef(null);
+  const imageInputRef = useRef(null);
   
   // Delete confirmation states
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -17,6 +21,31 @@ function DataPage({ program, year, onBack, onLogout }) {
     setShowAddModal(true);
     setNewEntryName('');
   };
+
+  useEffect(() => {
+    // Load workYear info (datasheets/images) if program and year provided
+    const loadWorkYear = async () => {
+      if (!program || !year) return;
+      try {
+        // We need to find the workYear by querying program's workYears list
+        // The backend provides an endpoint to list work years for a program
+        const resp = await workYearService.getProgramWorkYears(program._id);
+        if (resp.success) {
+          const found = (resp.workYears || []).find(w => w.year === parseInt(year, 10));
+          if (found) {
+            const single = await workYearService.getWorkYearById(found._id);
+            if (single.success) setWorkYearData(single.workYear);
+            else setWorkYearData(null);
+          } else {
+            setWorkYearData(null);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load workYear data', err);
+      }
+    };
+    loadWorkYear();
+  }, [program, year]);
 
   const closeAddModal = () => {
     setShowAddModal(false);
@@ -94,6 +123,47 @@ function DataPage({ program, year, onBack, onLogout }) {
     }
   };
 
+  const handleUploadDatasheets = async (e) => {
+    e.preventDefault();
+    if (!workYearData) return alert('No work year selected or work year not found');
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+    try {
+      const resp = await workYearService.uploadDatasheets(workYearData._id, files);
+      if (resp.success) {
+        // refresh
+        const single = await workYearService.getWorkYearById(workYearData._id);
+        if (single.success) setWorkYearData(single.workYear);
+        alert('Datasheets uploaded');
+      } else {
+        alert(resp.message || 'Upload failed');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Upload failed');
+    }
+  };
+
+  const handleUploadImages = async (e) => {
+    e.preventDefault();
+    if (!workYearData) return alert('No work year selected or work year not found');
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+    try {
+      const resp = await workYearService.uploadImages(workYearData._id, files);
+      if (resp.success) {
+        const single = await workYearService.getWorkYearById(workYearData._id);
+        if (single.success) setWorkYearData(single.workYear);
+        alert('Images uploaded');
+      } else {
+        alert(resp.message || 'Upload failed');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Upload failed');
+    }
+  };
+
   const handleProcess = (entryId, e) => {
     e.stopPropagation();
     // TODO: Implement process logic
@@ -121,6 +191,48 @@ function DataPage({ program, year, onBack, onLogout }) {
         <div className="data-rectangle">
           <h2>Data Management</h2>
           
+          {/* Work year files (datasheets / images) */}
+          <div className="workyear-files-container" style={{ marginBottom: '12px' }}>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <strong>Work Year Files:</strong>
+              {workYearData ? (
+                <span>{workYearData.year} — {workYearData.notes || ''}</span>
+              ) : (
+                <span>No work year data available for this program/year</span>
+              )}
+            </div>
+
+            <div style={{ marginTop: '8px', display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <input type="file" multiple style={{ display: 'none' }} ref={datasheetInputRef} onChange={handleUploadDatasheets} />
+              <button className="action-btn upload-btn" onClick={() => datasheetInputRef.current && datasheetInputRef.current.click()} disabled={!workYearData}>
+                Upload Datasheets
+              </button>
+
+              <input type="file" accept="image/*" multiple style={{ display: 'none' }} ref={imageInputRef} onChange={handleUploadImages} />
+              <button className="action-btn upload-btn" onClick={() => imageInputRef.current && imageInputRef.current.click()} disabled={!workYearData}>
+                Upload Images
+              </button>
+
+              {workYearData && workYearData.datasheets && workYearData.datasheets.length > 0 && (
+                <div className="files-list">
+                  <strong>Datasheets:</strong>
+                  {workYearData.datasheets.map(ds => (
+                    <a key={ds.filename} href={ds.url} target="_blank" rel="noreferrer" style={{ marginLeft: 8 }}>{ds.originalname}</a>
+                  ))}
+                </div>
+              )}
+
+              {workYearData && workYearData.images && workYearData.images.length > 0 && (
+                <div className="files-list">
+                  <strong>Images:</strong>
+                  {workYearData.images.map(img => (
+                    <a key={img.filename} href={img.url} target="_blank" rel="noreferrer" style={{ marginLeft: 8 }}>{img.originalname}</a>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
           {/* Add Data Entry Button - at top center but below title */}
           <div className="add-entry-container">
             <button onClick={openAddModal} className="add-entry-btn">
