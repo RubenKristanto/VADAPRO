@@ -13,4 +13,8 @@ router.delete('/:id', programController.deleteProgram);
 router.post('/:id/participants/add', programController.addParticipant);
 router.post('/:id/participants/remove', programController.removeParticipant);
 
+// File upload routes (datasheets and images)
+router.post('/:id/datasheets', programController.uploadDatasheets);
+router.post('/:id/images', programController.uploadImages);
+
 module.exports = router;
