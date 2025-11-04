@@ -112,9 +112,9 @@ function App() {
           />
         ) : (
           <ProcessPage 
-            entry={null}
-            program={null}
-            year={null}
+            entry={selectedEntry}
+            program={selectedProgram}
+            year={selectedYear}
             onBack={handleBackToData}
             onLogout={handleLogout}
             organization={selectedOrganization}

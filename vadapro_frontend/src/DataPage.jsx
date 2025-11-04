@@ -148,27 +148,19 @@ function DataPage({ program, year, onBack, onLogout, onNavigateToProcess }) {
     const file = e.target.files[0];
     if (!file) return;
 
-    // If a workYear is selected on this page, upload the file to the backend and refresh workYear data
     (async () => {
       try {
         if (workYearData && workYearData._id) {
-          // Call backend upload endpoint
-          const resp = await workYearService.uploadDatasheets(workYearData._id, [file]);
+          const resp = await workYearService.uploadDatasheets(workYearData._id, entryId, [file]);
           if (resp && resp.success) {
-            // Refresh workYear data from server
+            // Refresh from server
             const single = await workYearService.getWorkYearById(workYearData._id);
             if (single && single.success) {
               setWorkYearData(single.workYear);
               setEntries(mapEntriesFromWorkYear(single.workYear));
             }
-
-            // Update the entry's sourceFile to the uploaded file name (use returned metadata if available)
-            const uploadedName = (resp.files && resp.files.length > 0 && (resp.files[0].originalName || resp.files[0].originalname || resp.files[0].filename)) || file.name;
-            const updatedEntries = entries.map(entry => entry.id === entryId ? { ...entry, sourceFile: uploadedName, responseCount: Math.max(entry.responseCount, 1) } : entry);
-            setEntries(updatedEntries);
             return;
           }
-          // If server returned non-success, fall back to local update and notify user
           alert(resp.message || 'Upload failed');
         } else {
           // No workYear selected: update locally (offline mode)
@@ -177,7 +169,7 @@ function DataPage({ program, year, onBack, onLogout, onNavigateToProcess }) {
               return {
                 ...entry,
                 sourceFile: file.name,
-                responseCount: Math.floor(Math.random() * 100) + 1 // Temporary random count
+                responseCount: Math.floor(Math.random() * 100) + 1
               };
             }
             return entry;
@@ -277,23 +269,25 @@ function DataPage({ program, year, onBack, onLogout, onNavigateToProcess }) {
                             <span className="source-filename">
                               {entry.sourceFile || 'No file uploaded'}
                             </span>
-                            <label className="upload-btn-wrapper">
-                              <input
-                                type="file"
-                                onChange={(e) => handleFileUpload(entry.id, e)}
-                                style={{ display: 'none' }}
-                                accept=".csv,.xlsx,.xls"
-                              />
-                              <button 
-                                className="action-btn upload-btn"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  e.currentTarget.previousSibling.click();
-                                }}
-                              >
-                                Upload
-                              </button>
-                            </label>
+                            {!entry.sourceFile && (
+                              <label className="upload-btn-wrapper">
+                                <input
+                                  type="file"
+                                  onChange={(e) => handleFileUpload(entry.id, e)}
+                                  style={{ display: 'none' }}
+                                  accept=".csv,.xlsx,.xls"
+                                />
+                                <button 
+                                  className="action-btn upload-btn"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    e.currentTarget.previousSibling.click();
+                                  }}
+                                >
+                                  Upload
+                                </button>
+                              </label>
+                            )}
                           </div>
                           <div className="response-section">
                             <span className="info-label">Response:</span>

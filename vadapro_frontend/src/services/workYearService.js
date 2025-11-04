@@ -1,12 +1,11 @@
 import axiosAPI from '../utils/axiosConfig';
 
 class WorkYearService {
-  async createWorkYear(programId, year, creatorUsername, notes) {
+  async createWorkYear(programId, year, notes) {
     try {
       const response = await axiosAPI.post('/workyears/create', {
         programId,
         year,
-        creatorUsername,
         notes
       });
       return response.data;
@@ -42,11 +41,20 @@ class WorkYearService {
     }
   }
 
-  async uploadDatasheets(workYearId, files) {
+  async updateEntry(workYearId, entryId, sourceFile) {
+    try {
+      const response = await axiosAPI.put(`/workyears/${workYearId}/entries/${entryId}`, { sourceFile });
+      return response.data;
+    } catch (error) {
+      throw this.handleError(error);
+    }
+  }
+
+  async uploadDatasheets(workYearId, entryId, files) {
     try {
       const form = new FormData();
       files.forEach(f => form.append('datasheets', f));
-      const response = await axiosAPI.post(`/workyears/${workYearId}/datasheets`, form, {
+      const response = await axiosAPI.post(`/workyears/${workYearId}/entries/${entryId}/datasheets`, form, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
       return response.data;

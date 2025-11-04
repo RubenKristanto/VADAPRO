@@ -12,65 +12,26 @@ exports.createProcess = async (req, res) => {
             sourceFile,
             responseCount,
             rawData,
-            programId,
-            organizationId,
-            creatorUsername,
+            entryId,
             year,
             tags,
             danfoConfig,
             processingConfig
         } = req.body;
 
-        // Validate required fields (program and year are optional for now)
-        if (!name || !organizationId || !creatorUsername) {
+        // Validate required fields
+        if (!name || !entryId) {
             return res.status(400).json({
                 success: false,
-                message: 'Name, organization ID, and creator username are required'
+                message: 'Name and entry ID are required'
             });
         }
 
-        // Validate organization ID
-        if (!mongoose.Types.ObjectId.isValid(organizationId)) {
+        // Validate entry ID
+        if (!mongoose.Types.ObjectId.isValid(entryId)) {
             return res.status(400).json({
                 success: false,
-                message: 'Invalid organization ID'
-            });
-        }
-
-        // Validate program ID if provided
-        if (programId && !mongoose.Types.ObjectId.isValid(programId)) {
-            return res.status(400).json({
-                success: false,
-                message: 'Invalid program ID'
-            });
-        }
-
-        // Find the creator user
-        const creator = await User.findOne({ username: creatorUsername });
-        if (!creator) {
-            return res.status(404).json({
-                success: false,
-                message: 'Creator user not found'
-            });
-        }
-
-        // Verify program exists (only if programId is provided)
-        if (programId) {
-            const program = await Program.findById(programId);
-            if (!program) {
-                return res.status(404).json({
-                    success: false,
-                    message: 'Program not found'
-                });
-            }
-        }
-
-        // Verify organization exists
-        const organization = await Organization.findById(organizationId);
-        if (!organization) {
-            return res.status(404).json({
-                success: false,
-                message: 'Organization not found'
+                message: 'Invalid entry ID'
             });
         }
 
@@ -80,10 +41,8 @@ exports.createProcess = async (req, res) => {
             sourceFile: sourceFile ? sourceFile.trim() : undefined,
             responseCount: responseCount || 0,
             rawData: rawData || null,
-            program: programId || null,  // Allow null if not provided
-            organization: organizationId,
-            creator: creator._id,
-            year: year || null,  // Allow null if not provided
+            entry: entryId,
+            year: year || null,
             tags: tags || [],
             danfoConfig: danfoConfig || undefined,
             processingConfig: processingConfig || undefined
@@ -91,16 +50,10 @@ exports.createProcess = async (req, res) => {
 
         await process.save();
 
-        // Populate the response
-        const populatedProcess = await Process.findById(process._id)
-            .populate('program', 'name')
-            .populate('organization', 'name')
-            .populate('creator', 'username');
-
         res.status(201).json({
             success: true,
             message: 'Process created successfully',
-            process: populatedProcess
+            process: process
         });
 
     } catch (error) {
@@ -117,9 +70,6 @@ exports.createProcess = async (req, res) => {
 exports.getAllProcesses = async (req, res) => {
     try {
         const processes = await Process.find()
-            .populate('program', 'name')
-            .populate('organization', 'name')
-            .populate('creator', 'username')
             .sort({ createdAt: -1 });
 
         res.status(200).json({
@@ -150,10 +100,7 @@ exports.getProcessById = async (req, res) => {
             });
         }
 
-        const process = await Process.findById(id)
-            .populate('program', 'name description')
-            .populate('organization', 'name')
-            .populate('creator', 'username');
+        const process = await Process.findById(id);
 
         if (!process) {
             return res.status(404).json({
@@ -169,143 +116,6 @@ exports.getProcessById = async (req, res) => {
 
     } catch (error) {
         console.error('Error fetching process:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Internal server error',
-            error: error.message
-        });
-    }
-};
-
-// Get processes by program ID
-exports.getProcessesByProgram = async (req, res) => {
-    try {
-        const { programId } = req.params;
-
-        if (!mongoose.Types.ObjectId.isValid(programId)) {
-            return res.status(400).json({
-                success: false,
-                message: 'Invalid program ID'
-            });
-        }
-
-        const processes = await Process.find({ program: programId })
-            .populate('organization', 'name')
-            .populate('creator', 'username')
-            .sort({ createdAt: -1 });
-
-        res.status(200).json({
-            success: true,
-            count: processes.length,
-            processes
-        });
-
-    } catch (error) {
-        console.error('Error fetching processes by program:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Internal server error',
-            error: error.message
-        });
-    }
-};
-
-// Get processes by program and year
-exports.getProcessesByProgramAndYear = async (req, res) => {
-    try {
-        const { programId, year } = req.params;
-
-        if (!mongoose.Types.ObjectId.isValid(programId)) {
-            return res.status(400).json({
-                success: false,
-                message: 'Invalid program ID'
-            });
-        }
-
-        const processes = await Process.find({ 
-            program: programId,
-            year: parseInt(year)
-        })
-            .populate('organization', 'name')
-            .populate('creator', 'username')
-            .sort({ createdAt: -1 });
-
-        res.status(200).json({
-            success: true,
-            count: processes.length,
-            processes
-        });
-
-    } catch (error) {
-        console.error('Error fetching processes by program and year:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Internal server error',
-            error: error.message
-        });
-    }
-};
-
-// Get processes by organization ID
-exports.getProcessesByOrganization = async (req, res) => {
-    try {
-        const { organizationId } = req.params;
-
-        if (!mongoose.Types.ObjectId.isValid(organizationId)) {
-            return res.status(400).json({
-                success: false,
-                message: 'Invalid organization ID'
-            });
-        }
-
-        const processes = await Process.find({ organization: organizationId })
-            .populate('program', 'name')
-            .populate('creator', 'username')
-            .sort({ createdAt: -1 });
-
-        res.status(200).json({
-            success: true,
-            count: processes.length,
-            processes
-        });
-
-    } catch (error) {
-        console.error('Error fetching processes by organization:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Internal server error',
-            error: error.message
-        });
-    }
-};
-
-// Get processes by status
-exports.getProcessesByStatus = async (req, res) => {
-    try {
-        const { status } = req.params;
-
-        const validStatuses = ['ready', 'processing', 'completed', 'failed'];
-        if (!validStatuses.includes(status)) {
-            return res.status(400).json({
-                success: false,
-                message: 'Invalid status. Must be one of: ready, processing, completed, failed'
-            });
-        }
-
-        const processes = await Process.find({ processStatus: status })
-            .populate('program', 'name')
-            .populate('organization', 'name')
-            .populate('creator', 'username')
-            .sort({ createdAt: -1 });
-
-        res.status(200).json({
-            success: true,
-            count: processes.length,
-            processes
-        });
-
-    } catch (error) {
-        console.error('Error fetching processes by status:', error);
         res.status(500).json({
             success: false,
             message: 'Internal server error',
@@ -354,15 +164,10 @@ exports.updateProcess = async (req, res) => {
 
         await process.save();
 
-        const updatedProcess = await Process.findById(id)
-            .populate('program', 'name')
-            .populate('organization', 'name')
-            .populate('creator', 'username');
-
         res.status(200).json({
             success: true,
             message: 'Process updated successfully',
-            process: updatedProcess
+            process: process
         });
 
     } catch (error) {
@@ -403,95 +208,6 @@ exports.deleteProcess = async (req, res) => {
 
     } catch (error) {
         console.error('Error deleting process:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Internal server error',
-            error: error.message
-        });
-    }
-};
-
-// Add a log entry
-exports.addLog = async (req, res) => {
-    try {
-        const { id } = req.params;
-        const { message, level } = req.body;
-
-        if (!mongoose.Types.ObjectId.isValid(id)) {
-            return res.status(400).json({
-                success: false,
-                message: 'Invalid process ID'
-            });
-        }
-
-        if (!message) {
-            return res.status(400).json({
-                success: false,
-                message: 'Log message is required'
-            });
-        }
-
-        const process = await Process.findById(id);
-        if (!process) {
-            return res.status(404).json({
-                success: false,
-                message: 'Process not found'
-            });
-        }
-
-        const log = {
-            message: message.trim(),
-            level: level || 'info',
-            timestamp: new Date()
-        };
-
-        process.logs.push(log);
-        await process.save();
-
-        res.status(200).json({
-            success: true,
-            message: 'Log added successfully',
-            log
-        });
-
-    } catch (error) {
-        console.error('Error adding log:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Internal server error',
-            error: error.message
-        });
-    }
-};
-
-// Get all logs for a process
-exports.getLogs = async (req, res) => {
-    try {
-        const { id } = req.params;
-
-        if (!mongoose.Types.ObjectId.isValid(id)) {
-            return res.status(400).json({
-                success: false,
-                message: 'Invalid process ID'
-            });
-        }
-
-        const process = await Process.findById(id).select('logs');
-        if (!process) {
-            return res.status(404).json({
-                success: false,
-                message: 'Process not found'
-            });
-        }
-
-        res.status(200).json({
-            success: true,
-            count: process.logs.length,
-            logs: process.logs
-        });
-
-    } catch (error) {
-        console.error('Error fetching logs:', error);
         res.status(500).json({
             success: false,
             message: 'Internal server error',
@@ -560,42 +276,6 @@ exports.addChatMessage = async (req, res) => {
 
     } catch (error) {
         console.error('Error adding chat message:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Internal server error',
-            error: error.message
-        });
-    }
-};
-
-// Get chat messages for a process
-exports.getChatMessages = async (req, res) => {
-    try {
-        const { id } = req.params;
-
-        if (!mongoose.Types.ObjectId.isValid(id)) {
-            return res.status(400).json({
-                success: false,
-                message: 'Invalid process ID'
-            });
-        }
-
-        const process = await Process.findById(id).select('chatMessages');
-        if (!process) {
-            return res.status(404).json({
-                success: false,
-                message: 'Process not found'
-            });
-        }
-
-        res.status(200).json({
-            success: true,
-            count: process.chatMessages.length,
-            chatMessages: process.chatMessages
-        });
-
-    } catch (error) {
-        console.error('Error fetching chat messages:', error);
         res.status(500).json({
             success: false,
             message: 'Internal server error',
@@ -816,43 +496,6 @@ exports.updateStatValue = async (req, res) => {
 
     } catch (error) {
         console.error('Error updating statistic value:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Internal server error',
-            error: error.message
-        });
-    }
-};
-
-// Get selected statistics
-exports.getSelectedStats = async (req, res) => {
-    try {
-        const { id } = req.params;
-
-        if (!mongoose.Types.ObjectId.isValid(id)) {
-            return res.status(400).json({
-                success: false,
-                message: 'Invalid process ID'
-            });
-        }
-
-        const process = await Process.findById(id).select('selectedStats statisticsData');
-        if (!process) {
-            return res.status(404).json({
-                success: false,
-                message: 'Process not found'
-            });
-        }
-
-        res.status(200).json({
-            success: true,
-            count: process.selectedStats.length,
-            selectedStats: process.selectedStats,
-            statisticsData: Object.fromEntries(process.statisticsData)
-        });
-
-    } catch (error) {
-        console.error('Error fetching selected statistics:', error);
         res.status(500).json({
             success: false,
             message: 'Internal server error',

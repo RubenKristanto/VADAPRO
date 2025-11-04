@@ -144,20 +144,8 @@ const processSchema = new mongoose.Schema({
     chatMessages: [chatMessageSchema],
     
     // Relationships
-    program: {
+    entry: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'Program',
-        required: false,  // Made optional - backend not implemented yet
-        default: null
-    },
-    organization: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'Organization',
-        required: true
-    },
-    creator: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'User',
         required: true
     },
     
@@ -247,12 +235,9 @@ const processSchema = new mongoose.Schema({
 });
 
 // Indexes for better query performance
-processSchema.index({ program: 1, year: 1 });
-processSchema.index({ organization: 1 });
-processSchema.index({ creator: 1 });
+processSchema.index({ entry: 1 });
 processSchema.index({ processStatus: 1 });
 processSchema.index({ createdAt: -1 });
 processSchema.index({ name: 'text', tags: 'text' });
-processSchema.index({ program: 1, year: 1, processStatus: 1 });
 
 module.exports = mongoose.model('Process', processSchema, 'processes');

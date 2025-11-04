@@ -43,20 +43,17 @@ function LoginPage({ onLoginSuccess }) {
     setMessage('');
     setErrorType('');
     try {
-      console.log('Attempting login with:', { username, password });
       const result = await authService.login({ username, password });
       
       // If login is successful, call the success callback immediately
       if (result && result.token) {
-        console.log('login success');
+        console.log(`Logged in - Username: ${result.user.username}, ID: ${result.user.id || result.user._id}`);
         // Small delay to show success message before transition
         setTimeout(() => {
           if (onLoginSuccess) {
             onLoginSuccess(result.user);
           }
         }, 500);
-      } else {
-        console.log('login failed');
       }
       
     } catch (err) {

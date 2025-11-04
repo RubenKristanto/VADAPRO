@@ -4,11 +4,9 @@ export const authService = {
   // Register function
   async register(credentials) {
     try {
-      console.log('calling axios API');
       const response = await axiosAPI.post('/auth/register', credentials);
       return { message: response.data.message };
     } catch (error) {
-      console.log('something wrong with axios');
       const err = new Error(error.response?.data?.message || 'Registration failed');
       err.errorType = error.response?.data?.errorType || 'error';
       throw err;
@@ -18,7 +16,6 @@ export const authService = {
   // Login function
   async login(credentials) {
     try {
-      console.log(credentials);
       const response = await axiosAPI.post('/auth/login', credentials);
       
       // Check if the response indicates success

@@ -7,13 +7,13 @@ const mongoose = require('mongoose');
 // Create a new program
 exports.createProgram = async (req, res) => {
     try {
-        const { name, description, organizationId, creatorUsername, startDate, endDate } = req.body;
+        const { name, description, organizationId, startDate, endDate } = req.body;
 
         // Validate required fields
-        if (!name || !organizationId || !creatorUsername) {
+        if (!name || !organizationId) {
             return res.status(400).json({
                 success: false,
-                message: 'Program name, organization ID, and creator username are required'
+                message: 'Program name and organization ID are required'
             });
         }
 
@@ -22,15 +22,6 @@ exports.createProgram = async (req, res) => {
             return res.status(400).json({
                 success: false,
                 message: 'Invalid organization ID'
-            });
-        }
-
-        // Find the creator user
-        const creator = await User.findOne({ username: creatorUsername });
-        if (!creator) {
-            return res.status(404).json({
-                success: false,
-                message: 'Creator user not found'
             });
         }
 
@@ -43,22 +34,11 @@ exports.createProgram = async (req, res) => {
             });
         }
 
-        // Check if user is an admin of the organization (only admins can create programs)
-        const isAdmin = await Membership.isAdmin(creator._id, organizationId);
-        if (!isAdmin) {
-            return res.status(403).json({
-                success: false,
-                message: 'Only admins can create programs in this organization'
-            });
-        }
-
         // Create the program
         const program = new Program({
             name: name.trim(),
             description: description ? description.trim() : undefined,
             organization: organizationId,
-            creator: creator._id,
-            participants: [creator._id], // Creator is automatically a participant
             startDate: startDate ? new Date(startDate) : undefined,
             endDate: endDate ? new Date(endDate) : undefined
         });
@@ -73,9 +53,7 @@ exports.createProgram = async (req, res) => {
 
         // Populate the response
         const populatedProgram = await Program.findById(program._id)
-            .populate('organization', 'name')
-            .populate('creator', 'username')
-            .populate('participants', 'username');
+            .populate('organization', 'name');
 
         res.status(201).json({
             success: true,
@@ -107,8 +85,6 @@ exports.getOrganizationPrograms = async (req, res) => {
 
         const programs = await Program.find({ organization: organizationId })
             .populate('organization', 'name')
-            .populate('creator', 'username')
-            .populate('participants', 'username')
             .sort({ createdAt: -1 });
 
         res.status(200).json({
@@ -139,9 +115,7 @@ exports.getProgramById = async (req, res) => {
         }
 
         const program = await Program.findById(id)
-            .populate('organization', 'name')
-            .populate('creator', 'username')
-            .populate('participants', 'username');
+            .populate('organization', 'name');
 
         if (!program) {
             return res.status(404).json({
@@ -226,9 +200,7 @@ exports.editProgram = async (req, res) => {
 
         // Populate the response
         const updatedProgram = await Program.findById(id)
-            .populate('organization', 'name')
-            .populate('creator', 'username')
-            .populate('participants', 'username');
+            .populate('organization', 'name');
 
         res.status(200).json({
             success: true,
@@ -238,192 +210,6 @@ exports.editProgram = async (req, res) => {
 
     } catch (error) {
         console.error('Error updating program:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Internal server error',
-            error: error.message
-        });
-    }
-};
-
-// Add participant to program
-exports.addParticipant = async (req, res) => {
-    try {
-        const { id } = req.params;
-        const { participantUsername, adderUsername } = req.body;
-
-        if (!mongoose.Types.ObjectId.isValid(id)) {
-            return res.status(400).json({
-                success: false,
-                message: 'Invalid program ID'
-            });
-        }
-
-        // Find the program
-        const program = await Program.findById(id).populate('organization');
-        if (!program) {
-            return res.status(404).json({
-                success: false,
-                message: 'Program not found'
-            });
-        }
-
-        // Find the participant user
-        const participant = await User.findOne({ username: participantUsername });
-        if (!participant) {
-            return res.status(404).json({
-                success: false,
-                message: 'User to be added not found'
-            });
-        }
-
-        // Find the adder user
-        const adder = await User.findOne({ username: adderUsername });
-        if (!adder) {
-            return res.status(404).json({
-                success: false,
-                message: 'Adder user not found'
-            });
-        }
-
-        // Check if adder has permission (must be organization member)
-        const isAdderMember = await Membership.isMember(adder._id, program.organization._id);
-
-        if (!isAdderMember) {
-            return res.status(403).json({
-                success: false,
-                message: 'You must be a member of the organization to add participants to programs'
-            });
-        }
-
-        // Check if participant is a member of the organization
-        const isParticipantMember = await Membership.isMember(participant._id, program.organization._id);
-
-        if (!isParticipantMember) {
-            return res.status(400).json({
-                success: false,
-                message: 'User must be a member of the organization to participate in programs'
-            });
-        }
-
-        // Check if user is already a participant
-        const isAlreadyParticipant = program.participants.some(p => 
-            p.toString() === participant._id.toString()
-        );
-
-        if (isAlreadyParticipant) {
-            return res.status(409).json({
-                success: false,
-                message: 'User is already a participant in this program'
-            });
-        }
-
-        // Add participant to program
-        program.participants.push(participant._id);
-        await program.save();
-
-        // Populate the response
-        const updatedProgram = await Program.findById(id)
-            .populate('organization', 'name')
-            .populate('creator', 'username')
-            .populate('participants', 'username');
-
-        res.status(200).json({
-            success: true,
-            message: 'Participant added successfully',
-            program: updatedProgram
-        });
-
-    } catch (error) {
-        console.error('Error adding participant:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Internal server error',
-            error: error.message
-        });
-    }
-};
-
-// Remove participant from program
-exports.removeParticipant = async (req, res) => {
-    try {
-        const { id } = req.params;
-        const { participantUsername, removerUsername } = req.body;
-
-        if (!mongoose.Types.ObjectId.isValid(id)) {
-            return res.status(400).json({
-                success: false,
-                message: 'Invalid program ID'
-            });
-        }
-
-        // Find the program
-        const program = await Program.findById(id).populate('organization');
-        if (!program) {
-            return res.status(404).json({
-                success: false,
-                message: 'Program not found'
-            });
-        }
-
-        // Find the participant to remove
-        const participant = await User.findOne({ username: participantUsername });
-        if (!participant) {
-            return res.status(404).json({
-                success: false,
-                message: 'Participant to be removed not found'
-            });
-        }
-
-        // Find the remover user
-        const remover = await User.findOne({ username: removerUsername });
-        if (!remover) {
-            return res.status(404).json({
-                success: false,
-                message: 'Remover user not found'
-            });
-        }
-
-        // Check if remover has permission (must be program creator, organization creator, or self-removal)
-        const isProgramCreator = program.creator.toString() === remover._id.toString();
-        const isOrgCreator = program.organization.creator.toString() === remover._id.toString();
-        const isSelfRemoval = participant._id.toString() === remover._id.toString();
-
-        if (!isProgramCreator && !isOrgCreator && !isSelfRemoval) {
-            return res.status(403).json({
-                success: false,
-                message: 'You do not have permission to remove participants from this program'
-            });
-        }
-
-        // Cannot remove the program creator
-        if (participant._id.toString() === program.creator.toString()) {
-            return res.status(400).json({
-                success: false,
-                message: 'Cannot remove the program creator'
-            });
-        }
-
-        // Remove participant from program
-        program.participants = program.participants.filter(p => 
-            p.toString() !== participant._id.toString()
-        );
-        await program.save();
-
-        // Populate the response
-        const updatedProgram = await Program.findById(id)
-            .populate('organization', 'name')
-            .populate('creator', 'username')
-            .populate('participants', 'username');
-
-        res.status(200).json({
-            success: true,
-            message: 'Participant removed successfully',
-            program: updatedProgram
-        });
-
-    } catch (error) {
-        console.error('Error removing participant:', error);
         res.status(500).json({
             success: false,
             message: 'Internal server error',

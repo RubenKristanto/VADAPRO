@@ -185,6 +185,7 @@ function OrganizationsPage({ onLogout, onOrganizationSelect, currentUser }) {
   };
 
   const handleOrganizationClick = (org) => {
+    console.log(`Accessing Organization - Name: ${org.name}, ID: ${org._id || org.id}`);
     if (onOrganizationSelect) {
       onOrganizationSelect(org);
     }

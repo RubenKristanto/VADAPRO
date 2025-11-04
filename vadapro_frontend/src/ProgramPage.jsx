@@ -53,14 +53,12 @@ function ProgramsPage({ organization, onBack, onLogout, onYearSelect }) {
 
   const createProgram = async () => {
     if (!newProgramName.trim()) return;
-    if (!authService.getCurrentUser()) return alert('User not available');
     setIsLoading(true);
     try {
       const resp = await programService.createProgram(
         newProgramName.trim(),
         '',
-        organization._id,
-        authService.getCurrentUser().username
+        organization._id
       );
       if (resp.success) {
         setNewProgramName('');
@@ -91,10 +89,9 @@ function ProgramsPage({ organization, onBack, onLogout, onYearSelect }) {
   const addYear = async () => {
     setYearError('');
     if (!newYear.trim() || !currentProgramForYear) return;
-    if (!authService.getCurrentUser()) return alert('User not available');
     setIsLoading(true);
     try {
-      const resp = await workYearService.createWorkYear(currentProgramForYear._id, parseInt(newYear.trim(), 10), authService.getCurrentUser().username);
+      const resp = await workYearService.createWorkYear(currentProgramForYear._id, parseInt(newYear.trim(), 10));
       if (resp.success) {
         const updatedPrograms = programs.map(p => {
           if (p._id === currentProgramForYear._id) {
@@ -237,6 +234,7 @@ function ProgramsPage({ organization, onBack, onLogout, onYearSelect }) {
                               onClick={(e) => {
                                 // Only navigate if not clicking delete button
                                 if (!e.target.classList.contains('year-delete-btn')) {
+                                  console.log(`Accessing Program - Name: ${program.name}, ID: ${program._id || program.id}, Year: ${year.year}`);
                                   onYearSelect && onYearSelect(program, year.year);
                                 }
                               }}

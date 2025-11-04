@@ -3,7 +3,6 @@ import axiosConfig from '../utils/axiosConfig';
 // Invite user to organization
 export const inviteUser = async (organizationId, username, inviterUsername) => {
   try {
-    console.log('Inviting user:', { organizationId, username, inviterUsername });
     const response = await axiosConfig.post('/membership/invite', {
       organizationId,
       username,

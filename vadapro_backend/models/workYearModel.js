@@ -12,14 +12,12 @@ const fileMetaSchema = new mongoose.Schema({
 const workYearSchema = new mongoose.Schema({
   program: { type: mongoose.Schema.Types.ObjectId, ref: 'Program', required: true },
   year: { type: Number, required: true },
-  createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-  datasheets: [fileMetaSchema],
-  images: [fileMetaSchema],
   // Entries represent uploaded data entries (CSV uploads or manually created entries)
   entries: [{
     name: { type: String, required: true },
     sourceFile: { type: String },
     responseCount: { type: Number, default: 0 },
+    file: fileMetaSchema,
     createdAt: { type: Date, default: Date.now }
   }],
   createdAt: { type: Date, default: Date.now }

@@ -145,8 +145,16 @@ function ProcessPage({ entry, program, year, onBack, onLogout, organization }) {
       try {
         setInitError(null); // Clear any previous errors
         
-        // Check for existing process ID in localStorage first
-        const storedProcessId = localStorage.getItem('currentProcessId');
+        // Get entry ID to use for unique process storage
+        const entryId = entry?._id || entry?.id;
+        if (!entry || !entryId) {
+          setInitError('Entry ID is required to create a process. Please select an entry first.');
+          return;
+        }
+        
+        // Check for existing process ID in localStorage using entry-specific key
+        const storageKey = `currentProcessId_${entryId}`;
+        const storedProcessId = localStorage.getItem(storageKey);
         
         if (storedProcessId) {
           // Try to fetch the existing process
@@ -154,6 +162,7 @@ function ProcessPage({ entry, program, year, onBack, onLogout, organization }) {
             const response = await processService.getProcessById(storedProcessId);
             if (response.success) {
               const process = response.process;
+              console.log(`Accessing Process - ID: ${process._id}`);
               setProcessId(process._id);
               setProcessStatus(process.processStatus || 'ready');
               setProgress(process.progress || 0);
@@ -200,54 +209,27 @@ function ProcessPage({ entry, program, year, onBack, onLogout, organization }) {
             }
           } catch (fetchError) {
             // Process not found or error fetching, will create new one below
-            console.log('Could not fetch existing process, will create new one:', fetchError);
-            localStorage.removeItem('currentProcessId'); // Clean up invalid ID
+            localStorage.removeItem(storageKey); // Clean up invalid ID
           }
         }
         
         // Create new process (if no stored ID or fetch failed)
-        // Get organization ID directly from organization prop (not from program)
-        let organizationId = null;
-        
-        if (organization) {
-          organizationId = organization._id || organization.id;
-        }
-        
-        // If still no organization ID, we can't proceed
-        if (!organizationId) {
-          setInitError('Organization ID is required to create a process. Please select an organization first.');
-          return;
-        }
-
-        // Get username from stored user object
-        let creatorUsername = 'unknown';
-        try {
-          const userStr = localStorage.getItem('user');
-          if (userStr) {
-            const user = JSON.parse(userStr);
-            creatorUsername = user.username || 'unknown';
-          }
-        } catch (parseError) {
-          console.error('Error parsing user from localStorage:', parseError);
-        }
-
         const processData = {
-          name: entry ? entry.name : 'Test Process',
-          sourceFile: entry ? (entry.sourceFile || '') : '',
-          responseCount: entry ? (entry.responseCount || 0) : 0,
-          rawData: entry ? (entry.data || null) : null,
-          programId: null,  // Always null - program backend not implemented yet
-          organizationId: organizationId,
-          creatorUsername: creatorUsername,
-          year: null  // Always null - year backend not implemented yet
+          name: entry.name || 'Test Process',
+          sourceFile: entry.sourceFile || '',
+          responseCount: entry.responseCount || 0,
+          rawData: entry.data || null,
+          entryId: entryId,
+          year: year || null
         };
 
         const response = await processService.createProcess(processData);
         if (response.success) {
           const newProcessId = response.process._id;
+          console.log(`Accessing Process - ID: ${newProcessId}`);
           setProcessId(newProcessId);
-          // Store the process ID in localStorage for persistence
-          localStorage.setItem('currentProcessId', newProcessId);
+          // Store the process ID in localStorage with entry-specific key
+          localStorage.setItem(storageKey, newProcessId);
         } else {
           setInitError(response.message || 'Failed to create process');
           console.error('Failed to create process:', response);
@@ -283,19 +265,8 @@ function ProcessPage({ entry, program, year, onBack, onLogout, organization }) {
     setStatisticsData(mockResults);
     // END MOCK DATA
     
-    // Update backend with mock data - SEQUENTIAL to avoid version conflicts
-    if (processId && selectedStats.length > 0) {
-      (async () => {
-        // Update stats one at a time to prevent race conditions
-        for (const statId of selectedStats) {
-          try {
-            await processService.updateStatValue(processId, statId, mockResults[statId]);
-          } catch (error) {
-            console.error(`Error updating stat value for ${statId}:`, error);
-          }
-        }
-      })();
-    }
+    // Note: Backend stat values are updated separately when stats are calculated
+    // Don't update here to avoid race conditions with addSelectedStat
 
   }, [selectedStats, entry, processId]);
   // ============================================
@@ -616,9 +587,6 @@ function ProcessPage({ entry, program, year, onBack, onLogout, organization }) {
                     <p className="placeholder-subtext">
                       Image will be loaded from backend
                     </p>
-                    <div className="placeholder-note">
-                      💡 <strong>Developer Note:</strong> Implement image fetching logic in the useEffect hook above
-                    </div>
                   </div>
                 )}
               </div>
@@ -673,11 +641,6 @@ function ProcessPage({ entry, program, year, onBack, onLogout, organization }) {
                       No statistics selected. Click "Add Statistics" to browse {getAllStats().length}+ available parameters.
                     </p>
                   )}
-                  
-                  <div className="danfojs-note">
-                    💡 <strong>Developer Note:</strong> {getAllStats().length} statistical parameters available via danfo.js. 
-                    See useEffect hook for implementation.
-                  </div>
                 </div>
 
                 {/* Entry Information with Statistics */}
@@ -821,11 +784,6 @@ function ProcessPage({ entry, program, year, onBack, onLogout, organization }) {
                     >
                       {isAiTyping ? '⏳' : '📤'}
                     </button>
-                  </div>
-
-                  {/* Gemini Integration Note */}
-                  <div className="gemini-note">
-                    💡 <strong>Developer Note:</strong> Gemini 2.5 Flash API integration point is in the sendMessageToGemini function above.
                   </div>
                 </div>
               </div>

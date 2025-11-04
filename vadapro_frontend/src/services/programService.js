@@ -4,13 +4,12 @@ import axiosAPI from '../utils/axiosConfig';
 class ProgramService {
   
   // Create a new program
-  async createProgram(name, description, organizationId, creatorUsername, startDate, endDate) {
+  async createProgram(name, description, organizationId, startDate, endDate) {
     try {
       const response = await axiosAPI.post('/programs/create', {
         name,
         description,
         organizationId,
-        creatorUsername,
         startDate,
         endDate
       });
@@ -58,32 +57,6 @@ class ProgramService {
     try {
       const response = await axiosAPI.delete(`/programs/${id}`, {
         data: { deleterUsername }
-      });
-      return response.data;
-    } catch (error) {
-      throw this.handleError(error);
-    }
-  }
-
-  // Add participant to program
-  async addParticipant(programId, participantUsername, adderUsername) {
-    try {
-      const response = await axiosAPI.post(`/programs/${programId}/participants/add`, {
-        participantUsername,
-        adderUsername
-      });
-      return response.data;
-    } catch (error) {
-      throw this.handleError(error);
-    }
-  }
-
-  // Remove participant from program
-  async removeParticipant(programId, participantUsername, removerUsername) {
-    try {
-      const response = await axiosAPI.post(`/programs/${programId}/participants/remove`, {
-        participantUsername,
-        removerUsername
       });
       return response.data;
     } catch (error) {

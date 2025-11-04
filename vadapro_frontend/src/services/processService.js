@@ -33,36 +33,6 @@ class ProcessService {
     }
   }
 
-  // Get processes by program
-  async getProcessesByProgram(programId) {
-    try {
-      const response = await axiosAPI.get(`/process/program/${programId}`);
-      return response.data;
-    } catch (error) {
-      throw this.handleError(error);
-    }
-  }
-
-  // Get processes by program and year
-  async getProcessesByProgramAndYear(programId, year) {
-    try {
-      const response = await axiosAPI.get(`/process/program/${programId}/year/${year}`);
-      return response.data;
-    } catch (error) {
-      throw this.handleError(error);
-    }
-  }
-
-  // Get processes by organization
-  async getProcessesByOrganization(organizationId) {
-    try {
-      const response = await axiosAPI.get(`/process/organization/${organizationId}`);
-      return response.data;
-    } catch (error) {
-      throw this.handleError(error);
-    }
-  }
-
   // Get processes by status
   async getProcessesByStatus(status) {
     try {

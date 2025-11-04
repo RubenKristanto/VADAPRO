@@ -3,16 +3,15 @@ const Program = require('../models/programModel');
 const User = require('../models/userModel');
 const Membership = require('../models/membershipModel');
 const mongoose = require('mongoose');
-const path = require('path');
-const fs = require('fs');
+const { GridFSBucket } = require('mongodb');
 
 // Create work year
 exports.createWorkYear = async (req, res) => {
   try {
-    const { programId, year, creatorUsername } = req.body;
+    const { programId, year } = req.body;
 
-    if (!programId || !year || !creatorUsername) {
-      return res.status(400).json({ success: false, message: 'programId, year and creatorUsername are required' });
+    if (!programId || !year) {
+      return res.status(400).json({ success: false, message: 'programId and year are required' });
     }
 
     if (!mongoose.Types.ObjectId.isValid(programId)) {
@@ -22,14 +21,7 @@ exports.createWorkYear = async (req, res) => {
     const program = await Program.findById(programId);
     if (!program) return res.status(404).json({ success: false, message: 'Program not found' });
 
-    const creator = await User.findOne({ username: creatorUsername });
-    if (!creator) return res.status(404).json({ success: false, message: 'Creator not found' });
-
-    // only admins can create work years
-    const isAdmin = await Membership.isAdmin(creator._id, program.organization);
-    if (!isAdmin) return res.status(403).json({ success: false, message: 'Only admins can create work years' });
-
-    const workYear = new WorkYear({ program: programId, year: parseInt(year, 10), createdBy: creator._id });
+    const workYear = new WorkYear({ program: programId, year: parseInt(year, 10) });
     await workYear.save();
 
     res.status(201).json({ success: true, message: 'Work year created', workYear });
@@ -62,7 +54,7 @@ exports.getWorkYearById = async (req, res) => {
     const { id } = req.params;
     if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ success: false, message: 'Invalid id' });
 
-    const workYear = await WorkYear.findById(id).populate('createdBy', 'username');
+    const workYear = await WorkYear.findById(id);
     if (!workYear) return res.status(404).json({ success: false, message: 'Work year not found' });
 
     res.status(200).json({ success: true, workYear });
@@ -97,84 +89,93 @@ exports.createEntry = async (req, res) => {
   }
 };
 
-// Helper to ensure upload dir
-function ensureDir(dir) {
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-}
-
-// Upload datasheets (accept multiple files)
-exports.uploadDatasheets = async (req, res) => {
+// Update entry sourceFile
+exports.updateEntry = async (req, res) => {
   try {
-    const { id } = req.params;
-    if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ success: false, message: 'Invalid id' });
+    const { id, entryId } = req.params;
+    const { sourceFile } = req.body;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ success: false, message: 'Invalid workYear id' });
+    if (!mongoose.Types.ObjectId.isValid(entryId)) return res.status(400).json({ success: false, message: 'Invalid entry id' });
 
     const workYear = await WorkYear.findById(id);
     if (!workYear) return res.status(404).json({ success: false, message: 'Work year not found' });
 
-    if (!req.files || req.files.length === 0) return res.status(400).json({ success: false, message: 'No files uploaded' });
+    const entry = workYear.entries.id(entryId);
+    if (!entry) return res.status(404).json({ success: false, message: 'Entry not found' });
 
-    const uploadDir = path.join(__dirname, '..', 'uploads', 'workyears', id);
-    ensureDir(uploadDir);
-
-    const saved = [];
-    for (const f of req.files) {
-      const target = path.join(uploadDir, f.filename);
-      // file already saved by multer.diskStorage to tmp location or with original name; multer configured in route
-      // Move/rename handled by multer's destination in route; here we just build meta
-      const meta = {
-        filename: f.filename,
-        originalName: f.originalname,
-        mimeType: f.mimetype,
-        size: f.size,
-        url: `/uploads/workyears/${id}/${f.filename}`
-      };
-      workYear.datasheets.push(meta);
-      saved.push(meta);
-    }
-
+    if (sourceFile !== undefined) entry.sourceFile = sourceFile;
     await workYear.save();
 
-    res.status(200).json({ success: true, message: 'Datasheets uploaded', files: saved });
+    res.status(200).json({ success: true, message: 'Entry updated', workYear });
+  } catch (err) {
+    console.error('updateEntry error', err);
+    res.status(500).json({ success: false, message: 'Internal server error', error: err.message });
+  }
+};
 
+// Upload file to GridFS and attach to entry
+exports.uploadDatasheets = async (req, res) => {
+  try {
+    const { id, entryId } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ success: false, message: 'Invalid workYear id' });
+    if (!mongoose.Types.ObjectId.isValid(entryId)) return res.status(400).json({ success: false, message: 'Invalid entry id' });
+
+    const workYear = await WorkYear.findById(id);
+    if (!workYear) return res.status(404).json({ success: false, message: 'Work year not found' });
+    
+    const entry = workYear.entries.id(entryId);
+    if (!entry) return res.status(404).json({ success: false, message: 'Entry not found' });
+    
+    if (!req.files || req.files.length === 0) return res.status(400).json({ success: false, message: 'No files uploaded' });
+
+    const bucket = new GridFSBucket(mongoose.connection.db, { bucketName: 'upload' });
+    const file = req.files[0]; // Take first file only
+
+    const uploadStream = bucket.openUploadStream(file.originalname, {
+      metadata: { workYearId: id, entryId: entryId, mimetype: file.mimetype, size: file.size }
+    });
+    uploadStream.end(file.buffer);
+    
+    await new Promise((resolve, reject) => {
+      uploadStream.on('finish', () => resolve());
+      uploadStream.on('error', reject);
+    });
+
+    const fileMeta = {
+      filename: uploadStream.id.toString(),
+      originalName: file.originalname,
+      mimeType: file.mimetype,
+      size: file.size,
+      url: `/api/workyears/files/${uploadStream.id}`
+    };
+    
+    entry.file = fileMeta;
+    entry.sourceFile = file.originalname;
+    await workYear.save();
+    
+    res.status(200).json({ success: true, message: 'File uploaded', files: [fileMeta] });
   } catch (err) {
     console.error('uploadDatasheets error', err);
     res.status(500).json({ success: false, message: 'Internal server error', error: err.message });
   }
 };
 
-// Upload images
-exports.uploadImages = async (req, res) => {
+// Download file from GridFS
+exports.downloadFile = async (req, res) => {
   try {
-    const { id } = req.params;
-    if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ success: false, message: 'Invalid id' });
+    const { fileId } = req.params;
+    const bucket = new GridFSBucket(mongoose.connection.db, { bucketName: 'upload' });
+    
+    const file = await bucket.find({ _id: new mongoose.Types.ObjectId(fileId) }).toArray();
+    if (!file || file.length === 0) return res.status(404).json({ success: false, message: 'File not found' });
 
-    const workYear = await WorkYear.findById(id);
-    if (!workYear) return res.status(404).json({ success: false, message: 'Work year not found' });
-
-    if (!req.files || req.files.length === 0) return res.status(400).json({ success: false, message: 'No files uploaded' });
-
-    const uploadDir = path.join(__dirname, '..', 'uploads', 'workyears', id);
-    ensureDir(uploadDir);
-
-    const saved = [];
-    for (const f of req.files) {
-      const meta = {
-        filename: f.filename,
-        originalName: f.originalname,
-        mimeType: f.mimetype,
-        size: f.size,
-        url: `/uploads/workyears/${id}/${f.filename}`
-      };
-      workYear.images.push(meta);
-      saved.push(meta);
-    }
-
-    await workYear.save();
-
-    res.status(200).json({ success: true, message: 'Images uploaded', files: saved });
-
+    res.set('Content-Type', file[0].metadata?.mimetype || 'application/octet-stream');
+    res.set('Content-Disposition', `attachment; filename="${file[0].filename}"`);
+    
+    bucket.openDownloadStream(new mongoose.Types.ObjectId(fileId)).pipe(res);
   } catch (err) {
-    console.error('uploadImages error', err);
+    console.error('downloadFile error', err);
     res.status(500).json({ success: false, message: 'Internal server error', error: err.message });
   }
 };
