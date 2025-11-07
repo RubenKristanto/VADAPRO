@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import './ProcessPage.css';
 import processService from './services/processService';
-import danfoService from './services/danfoService';
 
 function ProcessPage({ entry, program, year, onBack, onLogout, organization }) {
   const [processId, setProcessId] = useState(null); // Store the process ID from backend
@@ -24,9 +23,6 @@ function ProcessPage({ entry, program, year, onBack, onLogout, organization }) {
   const [showStatsModal, setShowStatsModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
-  const [availableColumns, setAvailableColumns] = useState([]);
-  const [selectedColumn, setSelectedColumn] = useState(null); // Which column to analyze
-  const [totalRows, setTotalRows] = useState(0);
   
   // Chat interface state for Gemini AI
   const [chatMessages, setChatMessages] = useState([
@@ -251,7 +247,7 @@ function ProcessPage({ entry, program, year, onBack, onLogout, organization }) {
   // ============================================
 
   // ============================================
-  // STATISTICAL CALCULATION LOGIC
+  // TODO: INSERT DANFO.JS STATISTICAL CALCULATION LOGIC HERE
   // ============================================
   // Calculate statistics when selected stats change
   useEffect(() => {
@@ -260,90 +256,19 @@ function ProcessPage({ entry, program, year, onBack, onLogout, organization }) {
       return;
     }
 
-    // Only calculate if we have an entry with a file
-    if (!entry || !entry.file || !entry.file.filename) {
-      console.log('No file available for statistics calculation');
-      return;
-    }
+  
+    // MOCK DATA - Remove this when implementing actual danfo.js logic
+    const mockResults = {};
+    selectedStats.forEach(statId => {
+      mockResults[statId] = (Math.random() * 100).toFixed(2);
+    });
+    setStatisticsData(mockResults);
+    // END MOCK DATA
+    
+    // Note: Backend stat values are updated separately when stats are calculated
+    // Don't update here to avoid race conditions with addSelectedStat
 
-    const calculateStats = async () => {
-      try {
-        const fileId = entry.file.filename; // This is the GridFS file ID
-        
-        console.log('Calculating statistics from file:', fileId);
-        console.log('Selected stats:', selectedStats);
-        console.log('Selected column:', selectedColumn);
-        
-        // Call backend to fetch CSV and calculate statistics
-        const response = await danfoService.calculateStatisticsFromFile(
-          fileId,
-          selectedStats,
-          selectedColumn // null = all columns, or specific column name
-        );
-
-        if (response.success) {
-          console.log('Statistics calculated successfully:', response);
-          
-          // Store available columns if not set yet
-          if (response.columns && response.columns.length > 0) {
-            setAvailableColumns(response.columns);
-            // Auto-select first column if none selected
-            if (!selectedColumn && response.columns.length > 0) {
-              setSelectedColumn(response.columns[0]);
-            }
-          }
-          
-          // Store total rows
-          if (response.totalRows) {
-            setTotalRows(response.totalRows);
-          }
-          
-          // Get statistics for the selected column (or first available column)
-          const statsResults = {};
-          const columnToUse = selectedColumn || (response.columns && response.columns[0]);
-          
-          if (columnToUse && response.statistics[columnToUse]) {
-            const columnStats = response.statistics[columnToUse];
-            
-            selectedStats.forEach(statId => {
-              if (columnStats[statId] !== undefined && columnStats[statId] !== null) {
-                statsResults[statId] = typeof columnStats[statId] === 'number' 
-                  ? columnStats[statId].toFixed(4) 
-                  : columnStats[statId];
-              }
-            });
-          }
-          
-          setStatisticsData(statsResults);
-          
-          // Update backend with calculated values
-          if (processId) {
-            for (const statId of selectedStats) {
-              if (statsResults[statId] !== undefined) {
-                try {
-                  await processService.updateStatValue(processId, statId, statsResults[statId]);
-                } catch (error) {
-                  console.error(`Error updating stat ${statId}:`, error);
-                }
-              }
-            }
-          }
-        } else {
-          console.error('Failed to calculate statistics:', response.message);
-        }
-      } catch (error) {
-        console.error('Error calculating statistics:', error);
-        // Show error in statistics data
-        const errorResults = {};
-        selectedStats.forEach(statId => {
-          errorResults[statId] = 'Error';
-        });
-        setStatisticsData(errorResults);
-      }
-    };
-
-    calculateStats();
-  }, [selectedStats, selectedColumn, entry, processId]);
+  }, [selectedStats, entry, processId]);
   // ============================================
   // END OF STATISTICAL CALCULATION LOGIC
   // ============================================
@@ -671,34 +596,6 @@ function ProcessPage({ entry, program, year, onBack, onLogout, organization }) {
             <div className="lower-body-section">
               {/* LEFT SECTION */}
               <div className="lower-left-section">
-                {/* Column Selection - Show if CSV has been loaded */}
-                {availableColumns.length > 0 && (
-                  <div className="column-selection-card">
-                    <div className="column-header">
-                      <h3>📁 Data Column</h3>
-                      <span className="column-info">
-                        {totalRows > 0 && `${totalRows} rows`}
-                      </span>
-                    </div>
-                    <div className="column-selector">
-                      <select 
-                        value={selectedColumn || ''}
-                        onChange={(e) => setSelectedColumn(e.target.value)}
-                        className="column-select"
-                      >
-                        {availableColumns.map(col => (
-                          <option key={col} value={col}>
-                            {col}
-                          </option>
-                        ))}
-                      </select>
-                      <p className="column-hint">
-                        Select a column to analyze from your CSV file
-                      </p>
-                    </div>
-                  </div>
-                )}
-                
                 {/* Statistical Parameters Selection - Compact View */}
                 <div className="stats-selection-card">
                   <div className="stats-header">
@@ -741,11 +638,7 @@ function ProcessPage({ entry, program, year, onBack, onLogout, organization }) {
                     </>
                   ) : (
                     <p className="no-stats-message">
-                      {!entry?.file ? (
-                        <>No CSV file uploaded. Upload a file from the Data page to calculate statistics.</>
-                      ) : (
-                        <>No statistics selected. Click "Add Statistics" to browse {getAllStats().length}+ available parameters.</>
-                      )}
+                      No statistics selected. Click "Add Statistics" to browse {getAllStats().length}+ available parameters.
                     </p>
                   )}
                 </div>
