@@ -7,7 +7,7 @@ npm install express
 This backend is built with Node.js, Express, and MongoDB (using Mongoose). It provides user authentication (register and login) with secure password hashing.
 
 ## Technologies Used
-- Node.js
+- Node.js (version 19.9.0) => use nvm for easily switch version
 - Express
 - MongoDB (with Mongoose)
 - bcryptjs (for password hashing)
@@ -82,3 +82,4 @@ vadapro_backend/
 
 ---
 This backend is ready for further expansion
+

@@ -39,9 +39,15 @@ result : tailwind able to scan all the template files
 ```
 result : tailwind features can be used inside the project. Dont forget to change language mode into tailwind instead of css so all warnings about tailwind disappear.
 
+
+
 <br><br>
+
+
 
 ### npm libraries added
 ```
+npm install -g patch-package
 npm install axios
+npm install danfojs
 ```
