@@ -64,6 +64,7 @@ function DataPage({ program, year, onBack, onLogout, onNavigateToProcess }) {
       name: e.name,
       sourceFile: e.sourceFile || null,
       responseCount: e.responseCount || 0,
+      file: e.file || null, // Include file metadata (GridFS file info)
       persisted: true
     }));
   };
