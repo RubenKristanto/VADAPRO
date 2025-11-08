@@ -8,6 +8,7 @@ const programRoutes = require('./routes/programs');
 const membershipRoutes = require('./routes/membership');
 const processRoutes = require('./routes/process');
 const workYearRoutes = require('./routes/workyears');
+const fileRoutes = require('./routes/file');
 const path = require('path');
 const mongoose = require('mongoose');
 
@@ -21,6 +22,7 @@ app.use('/programs', programRoutes); // Program routes
 app.use('/membership', membershipRoutes); // Membership routes
 app.use('/process', processRoutes); // Process routes
 app.use('/workyears', workYearRoutes); // WorkYear routes
+app.use('/file', fileRoutes); // File upload routes
 
 // Serve uploaded files
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));

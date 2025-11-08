@@ -1,14 +1,44 @@
 import { useState, useEffect } from 'react';
 import './ProcessPage.css';
 import processService from './services/processService';
+import * as dfd from 'danfojs';
+
+// Backend interface: GET /file/gridfs/:entryId returns CSV file from MongoDB GridFS
+
+// Custom quantile function for danfojs Series
+const quantile = (series, q) => {
+  const sorted = series.sortValues().values;
+  const pos = q * (sorted.length - 1);
+  const lower = Math.floor(pos);
+  const upper = Math.ceil(pos);
+  const weight = pos - lower;
+  return lower === upper ? sorted[lower] : sorted[lower] * (1 - weight) + sorted[upper] * weight;
+};
+
+const skew = (series) => {
+  const values = series.values;
+  const n = values.length;
+  const mean = values.reduce((a, b) => a + b, 0) / n;
+  const std = Math.sqrt(values.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / n);
+  return values.reduce((a, b) => a + Math.pow((b - mean) / std, 3), 0) / n;
+};
+
+const kurt = (series) => {
+  const values = series.values;
+  const n = values.length;
+  const mean = values.reduce((a, b) => a + b, 0) / n;
+  const std = Math.sqrt(values.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / n);
+  return values.reduce((a, b) => a + Math.pow((b - mean) / std, 4), 0) / n - 3;
+};
 
 function ProcessPage({ entry, program, year, onBack, onLogout, organization }) {
-  const [processId, setProcessId] = useState(null); // Store the process ID from backend
-  const [processStatus, setProcessStatus] = useState('ready'); // ready, processing, completed
+  const [processId, setProcessId] = useState(null);
+  const [processStatus, setProcessStatus] = useState('ready');
   const [progress, setProgress] = useState(0);
   const [logs, setLogs] = useState([]);
-  const [imageUrl, setImageUrl] = useState(null); // State to hold the image URL from backend
-  const [initError, setInitError] = useState(null); // Track initialization errors
+  const [imageUrl, setImageUrl] = useState(null);
+  const [initError, setInitError] = useState(null);
+  const [csvData, setCsvData] = useState(null); // DataFrame from CSV
   
   // Handler to clear current process and go back
   const handleBack = () => {
@@ -136,28 +166,21 @@ function ProcessPage({ entry, program, year, onBack, onLogout, organization }) {
   // ============================================
   // INITIALIZE PROCESS AND FETCH DATA FROM BACKEND
   // ============================================
-  // Initialize or fetch process when component mounts
   useEffect(() => {
     const initializeProcess = async () => {
-      // For now, we only check if we have an organization
-      // entry, program, and year are optional since backend not implemented yet
-      
       try {
-        setInitError(null); // Clear any previous errors
+        setInitError(null);
         
-        // Get entry ID to use for unique process storage
         const entryId = entry?._id || entry?.id;
         if (!entry || !entryId) {
           setInitError('Entry ID is required to create a process. Please select an entry first.');
           return;
         }
         
-        // Check for existing process ID in localStorage using entry-specific key
         const storageKey = `currentProcessId_${entryId}`;
         const storedProcessId = localStorage.getItem(storageKey);
         
         if (storedProcessId) {
-          // Try to fetch the existing process
           try {
             const response = await processService.getProcessById(storedProcessId);
             if (response.success) {
@@ -167,26 +190,21 @@ function ProcessPage({ entry, program, year, onBack, onLogout, organization }) {
               setProcessStatus(process.processStatus || 'ready');
               setProgress(process.progress || 0);
               
-              // Load logs
               if (process.logs && process.logs.length > 0) {
                 setLogs(process.logs.map(log => log.message));
               }
               
-              // Load image URL
               if (process.imageUrl) {
                 setImageUrl(process.imageUrl);
               }
               
-              // Load chat messages - ensure we have the initial AI greeting if empty
               if (process.chatMessages && process.chatMessages.length > 0) {
                 setChatMessages(process.chatMessages);
               }
               
-              // Load selected stats
               if (process.selectedStats && process.selectedStats.length > 0) {
                 setSelectedStats(process.selectedStats.map(s => s.statId));
                 
-                // Load calculated values from selectedStats
                 const statsData = {};
                 process.selectedStats.forEach(stat => {
                   if (stat.calculatedValue !== null && stat.calculatedValue !== undefined) {
@@ -194,7 +212,6 @@ function ProcessPage({ entry, program, year, onBack, onLogout, organization }) {
                   }
                 });
                 
-                // Also load from statisticsData Map if available (backend returns it as object)
                 if (process.statisticsData) {
                   Object.entries(process.statisticsData).forEach(([key, value]) => {
                     if (value !== null && value !== undefined) {
@@ -205,15 +222,13 @@ function ProcessPage({ entry, program, year, onBack, onLogout, organization }) {
                 
                 setStatisticsData(statsData);
               }
-              return; // Successfully loaded existing process
+              return;
             }
           } catch (fetchError) {
-            // Process not found or error fetching, will create new one below
-            localStorage.removeItem(storageKey); // Clean up invalid ID
+            localStorage.removeItem(storageKey);
           }
         }
         
-        // Create new process (if no stored ID or fetch failed)
         const processData = {
           name: entry.name || 'Test Process',
           sourceFile: entry.sourceFile || '',
@@ -228,7 +243,6 @@ function ProcessPage({ entry, program, year, onBack, onLogout, organization }) {
           const newProcessId = response.process._id;
           console.log(`Accessing Process - ID: ${newProcessId}`);
           setProcessId(newProcessId);
-          // Store the process ID in localStorage with entry-specific key
           localStorage.setItem(storageKey, newProcessId);
         } else {
           setInitError(response.message || 'Failed to create process');
@@ -242,54 +256,114 @@ function ProcessPage({ entry, program, year, onBack, onLogout, organization }) {
 
     initializeProcess();
   }, [organization]); // eslint-disable-line react-hooks/exhaustive-deps
-  // ============================================
-  // END OF PROCESS INITIALIZATION
-  // ============================================
-
-  // ============================================
-  // TODO: INSERT DANFO.JS STATISTICAL CALCULATION LOGIC HERE
-  // ============================================
-  // Calculate statistics when selected stats change
+  
+  // Fetch CSV data from GridFS using entry ID
   useEffect(() => {
-    if (selectedStats.length === 0) {
+    const fetchCsvData = async () => {
+      if (!entry?._id && !entry?.id) return;
+      try {
+        const entryId = entry._id || entry.id;
+        const csvUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/file/gridfs/${entryId}`;
+        const df = await dfd.readCSV(csvUrl);
+        setCsvData(df);
+        entry.responseCount = df.shape[0]; // Update response count with actual CSV row count
+        console.log('CSV loaded:', df.shape, 'columns:', df.columns);
+      } catch (error) {
+        console.error('Error loading CSV:', error.message);
+        setCsvData(null);
+      }
+    };
+    fetchCsvData();
+  }, [entry]);
+  
+  // ============================================
+  // STATISTICAL CALCULATION USING DANFOJS
+  // ============================================
+  useEffect(() => {
+    if (selectedStats.length === 0 || !csvData) {
       setStatisticsData({});
       return;
     }
 
-  
-    // MOCK DATA - Remove this when implementing actual danfo.js logic
-    const mockResults = {};
-    selectedStats.forEach(statId => {
-      mockResults[statId] = (Math.random() * 100).toFixed(2);
-    });
-    setStatisticsData(mockResults);
-    // END MOCK DATA
+    const calculateStats = async () => {
+      const results = {};
+      const numericCols = csvData.columns.filter(col => csvData[col].dtype === 'float32' || csvData[col].dtype === 'int32');
+      
+      console.log('Available columns:', csvData.columns);
+      console.log('Numeric columns:', numericCols);
+      
+      if (numericCols.length === 0) {
+        console.warn('No numeric columns found');
+        return;
+      }
+      
+      const firstCol = csvData[numericCols[0]];
+      console.log('Using column:', numericCols[0], 'with', firstCol.values.length, 'values');
+      
+      selectedStats.forEach(statId => {
+        try {
+          switch(statId) {
+            case 'mean': results[statId] = firstCol.mean().toFixed(2); break;
+            case 'median': results[statId] = firstCol.median().toFixed(2); break;
+            case 'std': results[statId] = firstCol.std().toFixed(2); break;
+            case 'variance': results[statId] = firstCol.var().toFixed(2); break;
+            case 'min': results[statId] = firstCol.min().toFixed(2); break;
+            case 'max': results[statId] = firstCol.max().toFixed(2); break;
+            case 'sum': results[statId] = firstCol.sum().toFixed(2); break;
+            case 'count': results[statId] = firstCol.count(); break;
+            case 'nunique': results[statId] = firstCol.nUnique(); break;
+            case 'range': results[statId] = (firstCol.max() - firstCol.min()).toFixed(2); break;
+            case 'q1': results[statId] = quantile(firstCol, 0.25).toFixed(2); break;
+            case 'q2': results[statId] = quantile(firstCol, 0.5).toFixed(2); break;
+            case 'q3': results[statId] = quantile(firstCol, 0.75).toFixed(2); break;
+            case 'iqr': results[statId] = (quantile(firstCol, 0.75) - quantile(firstCol, 0.25)).toFixed(2); break;
+            case 'p10': results[statId] = quantile(firstCol, 0.1).toFixed(2); break;
+            case 'p90': results[statId] = quantile(firstCol, 0.9).toFixed(2); break;
+            case 'p95': results[statId] = quantile(firstCol, 0.95).toFixed(2); break;
+            case 'p99': results[statId] = quantile(firstCol, 0.99).toFixed(2); break;
+            case 'abs_sum': results[statId] = firstCol.abs().sum().toFixed(2); break;
+            case 'abs_mean': results[statId] = firstCol.abs().mean().toFixed(2); break;
+            case 'cumsum': results[statId] = firstCol.cumSum().values[firstCol.values.length - 1].toFixed(2); break;
+            case 'cummax': results[statId] = firstCol.cumMax().values[firstCol.values.length - 1].toFixed(2); break;
+            case 'cummin': results[statId] = firstCol.cumMin().values[firstCol.values.length - 1].toFixed(2); break;
+            case 'cumprod': results[statId] = firstCol.cumProd().values[firstCol.values.length - 1].toFixed(2); break;
+            case 'skew': results[statId] = skew(firstCol).toFixed(2); break;
+            case 'kurtosis': results[statId] = kurt(firstCol).toFixed(2); break;
+            case 'mode': {
+              const valueCounts = firstCol.valueCounts();
+              results[statId] = valueCounts.index[0];
+              break;
+            }
+            default: results[statId] = 'N/A';
+          }
+          
+          if (processId && results[statId] !== undefined) {
+            processService.updateStatValue(processId, statId, results[statId]).catch(err => 
+              console.error('Error updating stat:', err)
+            );
+          }
+        } catch (e) {
+          console.error(`Error calculating ${statId}:`, e.message);
+          results[statId] = 'Error';
+        }
+      });
+      
+      console.log('Statistics calculated:', results);
+      setStatisticsData(results);
+    };
     
-    // Note: Backend stat values are updated separately when stats are calculated
-    // Don't update here to avoid race conditions with addSelectedStat
-
-  }, [selectedStats, entry, processId]);
-  // ============================================
-  // END OF STATISTICAL CALCULATION LOGIC
-  // ============================================
+    calculateStats();
+  }, [selectedStats, csvData, processId]);
 
   // Handle stat selection toggle
   const toggleStat = async (statId) => {
     const stat = getStatById(statId);
+    const isCurrentlySelected = selectedStats.includes(statId);
     
-    setSelectedStats(prev => {
-      if (prev.includes(statId)) {
-        return prev.filter(id => id !== statId);
-      } else {
-        return [...prev, statId];
-      }
-    });
-    
-    // Update backend
     if (processId && stat) {
       try {
-        if (!selectedStats.includes(statId)) {
-          // Adding stat
+        if (!isCurrentlySelected) {
+          // Adding stat - update backend FIRST
           await processService.addSelectedStat(processId, {
             statId: stat.id,
             label: stat.label,
@@ -297,13 +371,25 @@ function ProcessPage({ entry, program, year, onBack, onLogout, organization }) {
             category: stat.category,
             categoryLabel: stat.categoryLabel
           });
+          // Then update local state
+          setSelectedStats(prev => [...prev, statId]);
         } else {
           // Removing stat
           await processService.removeSelectedStat(processId, statId);
+          setSelectedStats(prev => prev.filter(id => id !== statId));
         }
       } catch (error) {
         console.error('Error updating selected stat:', error);
       }
+    } else {
+      // No processId, just update local state
+      setSelectedStats(prev => {
+        if (isCurrentlySelected) {
+          return prev.filter(id => id !== statId);
+        } else {
+          return [...prev, statId];
+        }
+      });
     }
   };
 
@@ -322,7 +408,16 @@ function ProcessPage({ entry, program, year, onBack, onLogout, organization }) {
   };
 
   // Clear all selected stats
-  const clearAllStats = () => {
+  const clearAllStats = async () => {
+    if (processId && selectedStats.length > 0) {
+      try {
+        for (const statId of selectedStats) {
+          await processService.removeSelectedStat(processId, statId);
+        }
+      } catch (error) {
+        console.error('Error clearing stats:', error);
+      }
+    }
     setSelectedStats([]);
     setSearchQuery('');
   };

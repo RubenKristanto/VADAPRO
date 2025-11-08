@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import './DataPage.css';
 import workYearService from './services/workYearService';
+import * as dfd from 'danfojs';
 
 function DataPage({ program, year, onBack, onLogout, onNavigateToProcess }) {
   const [entries, setEntries] = useState([]);
@@ -150,6 +151,7 @@ function DataPage({ program, year, onBack, onLogout, onNavigateToProcess }) {
 
     (async () => {
       try {
+        const df = await dfd.readCSV(file); // Count rows from uploaded CSV
         if (workYearData && workYearData._id) {
           const resp = await workYearService.uploadDatasheets(workYearData._id, entryId, [file]);
           if (resp && resp.success) {
@@ -157,7 +159,11 @@ function DataPage({ program, year, onBack, onLogout, onNavigateToProcess }) {
             const single = await workYearService.getWorkYearById(workYearData._id);
             if (single && single.success) {
               setWorkYearData(single.workYear);
-              setEntries(mapEntriesFromWorkYear(single.workYear));
+              const mappedEntries = mapEntriesFromWorkYear(single.workYear);
+              const updatedEntries = mappedEntries.map(entry => 
+                entry.id === entryId ? { ...entry, responseCount: df.shape[0] } : entry
+              );
+              setEntries(updatedEntries);
             }
             return;
           }
@@ -169,7 +175,7 @@ function DataPage({ program, year, onBack, onLogout, onNavigateToProcess }) {
               return {
                 ...entry,
                 sourceFile: file.name,
-                responseCount: Math.floor(Math.random() * 100) + 1
+                responseCount: df.shape[0]
               };
             }
             return entry;

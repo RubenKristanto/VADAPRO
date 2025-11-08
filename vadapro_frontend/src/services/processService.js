@@ -153,12 +153,11 @@ class ProcessService {
   // Update statistic value
   async updateStatValue(id, statId, value) {
     try {
-      const response = await axiosAPI.put(`/process/${id}/stats/${statId}`, {
-        value
-      });
+      const response = await axiosAPI.put(`/process/${id}/stats/${statId}`, { value });
       return response.data;
     } catch (error) {
-      throw this.handleError(error);
+      console.error(`Error updating stat ${statId}:`, error.message);
+      return this.handleError(error);
     }
   }
 
@@ -181,6 +180,16 @@ class ProcessService {
       const response = await axiosAPI.put(`/process/${id}/status`, {
         status
       });
+      return response.data;
+    } catch (error) {
+      throw this.handleError(error);
+    }
+  }
+
+  // Get CSV data URL - backend should return { success: true, csvUrl: 'url/to/csv' }
+  async getCsvData(id) {
+    try {
+      const response = await axiosAPI.get(`/process/${id}/csvdata`);
       return response.data;
     } catch (error) {
       throw this.handleError(error);

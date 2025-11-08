@@ -102,6 +102,13 @@ const processSchema = new mongoose.Schema({
         default: null
     },
     
+    // CSV file URL
+    csvUrl: {
+        type: String,
+        trim: true,
+        maxlength: 1000
+    },
+    
     // Image visualization
     imageUrl: {
         type: String,
