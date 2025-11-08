@@ -76,6 +76,24 @@ class WorkYearService {
     }
   }
 
+  async deleteWorkYear(id, deleterUsername) {
+    try {
+      const response = await axiosAPI.delete(`/workyears/${id}`, { data: { deleterUsername } });
+      return response.data;
+    } catch (error) {
+      throw this.handleError(error);
+    }
+  }
+
+  async deleteEntry(workYearId, entryId) {
+    try {
+      const response = await axiosAPI.delete(`/workyears/${workYearId}/entries/${entryId}`);
+      return response.data;
+    } catch (error) {
+      throw this.handleError(error);
+    }
+  }
+
   handleError(error) {
     if (error.response) {
       return { success: false, message: error.response.data.message || 'An error occurred', status: error.response.status, data: error.response.data };

@@ -2,6 +2,7 @@ const WorkYear = require('../models/workYearModel');
 const Program = require('../models/programModel');
 const User = require('../models/userModel');
 const Membership = require('../models/membershipModel');
+const Process = require('../models/processModel');
 const mongoose = require('mongoose');
 const { GridFSBucket } = require('mongodb');
 
@@ -176,6 +177,64 @@ exports.downloadFile = async (req, res) => {
     bucket.openDownloadStream(new mongoose.Types.ObjectId(fileId)).pipe(res);
   } catch (err) {
     console.error('downloadFile error', err);
+    res.status(500).json({ success: false, message: 'Internal server error', error: err.message });
+  }
+};
+
+exports.deleteWorkYear = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { deleterUsername } = req.body;
+    if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ success: false, message: 'Invalid id' });
+    const workYear = await WorkYear.findById(id).populate('program');
+    if (!workYear) return res.status(404).json({ success: false, message: 'Work year not found' });
+    const deleter = await User.findOne({ username: deleterUsername });
+    if (!deleter) return res.status(404).json({ success: false, message: 'User not found' });
+    const program = await Program.findById(workYear.program._id).populate('organization');
+    const isAdmin = await Membership.isAdmin(deleter._id, program.organization._id);
+    if (!isAdmin) return res.status(403).json({ success: false, message: 'Only admins can delete work years' });
+    
+    // Cascade delete: Delete all processes for this work year
+    await Process.deleteMany({ workYear: id });
+    
+    // Clean up GridFS files for this work year
+    if (workYear.entries && workYear.entries.length > 0) {
+      const bucket = new GridFSBucket(mongoose.connection.db, { bucketName: 'upload' });
+      for (const entry of workYear.entries) {
+        if (entry.file && entry.file.filename) {
+          try {
+            const files = await bucket.find({ filename: entry.file.filename }).toArray();
+            if (files.length > 0) {
+              await bucket.delete(files[0]._id);
+            }
+          } catch (err) {
+            console.error('Error deleting file from GridFS:', err);
+          }
+        }
+      }
+    }
+    
+    // Delete the work year
+    await WorkYear.findByIdAndDelete(id);
+    res.status(200).json({ success: true, message: 'Work year deleted' });
+  } catch (err) {
+    console.error('deleteWorkYear error', err);
+    res.status(500).json({ success: false, message: 'Internal server error', error: err.message });
+  }
+};
+
+exports.deleteEntry = async (req, res) => {
+  try {
+    const { id, entryId } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ success: false, message: 'Invalid workYear id' });
+    if (!mongoose.Types.ObjectId.isValid(entryId)) return res.status(400).json({ success: false, message: 'Invalid entry id' });
+    const workYear = await WorkYear.findById(id);
+    if (!workYear) return res.status(404).json({ success: false, message: 'Work year not found' });
+    workYear.entries = workYear.entries.filter(e => e._id.toString() !== entryId);
+    await workYear.save();
+    res.status(200).json({ success: true, message: 'Entry deleted', workYear });
+  } catch (err) {
+    console.error('deleteEntry error', err);
     res.status(500).json({ success: false, message: 'Internal server error', error: err.message });
   }
 };

@@ -139,8 +139,19 @@ function DataPage({ program, year, onBack, onLogout, onNavigateToProcess }) {
     setConfirmationStep('name');
   };
 
-  const finalDelete = () => {
-    setEntries(entries.filter(entry => entry.id !== entryToDelete.id));
+  const finalDelete = async () => {
+    try {
+      if (workYearData && workYearData._id && entryToDelete._id) {
+        await workYearService.deleteEntry(workYearData._id, entryToDelete.id);
+        const single = await workYearService.getWorkYearById(workYearData._id);
+        if (single && single.success) setEntries(mapEntriesFromWorkYear(single.workYear));
+      } else {
+        setEntries(entries.filter(entry => entry.id !== entryToDelete.id));
+      }
+    } catch (err) {
+      console.error('Delete entry error', err);
+      alert('Failed to delete entry');
+    }
     cancelDelete();
   };
 
@@ -259,8 +270,7 @@ function DataPage({ program, year, onBack, onLogout, onNavigateToProcess }) {
                         <button 
                           onClick={(e) => initiateDelete(entry, e)}
                           className="delete-entry-btn"
-                          title={entry.persisted ? 'Cannot delete persisted entry' : 'Delete Entry'}
-                          disabled={entry.persisted}
+                          title="Delete Entry"
                         >
                           ×
                         </button>

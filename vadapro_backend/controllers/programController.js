@@ -2,7 +2,10 @@ const Program = require('../models/programModel');
 const Organization = require('../models/organizationModel');
 const User = require('../models/userModel');
 const Membership = require('../models/membershipModel');
+const WorkYear = require('../models/workYearModel');
+const Process = require('../models/processModel');
 const mongoose = require('mongoose');
+const { GridFSBucket } = require('mongodb');
 
 // Create a new program
 exports.createProgram = async (req, res) => {
@@ -257,6 +260,38 @@ exports.deleteProgram = async (req, res) => {
                 message: 'Only admins can delete programs in this organization'
             });
         }
+
+        // Cascade delete: Find all work years for this program
+        const workYears = await WorkYear.find({ program: id });
+
+        // Delete each work year and its associated data
+        for (const workYear of workYears) {
+            // Delete all processes for this work year
+            await Process.deleteMany({ workYear: workYear._id });
+            
+            // Clean up GridFS files for this work year
+            if (workYear.entries && workYear.entries.length > 0) {
+                const bucket = new GridFSBucket(mongoose.connection.db, { bucketName: 'upload' });
+                for (const entry of workYear.entries) {
+                    if (entry.file && entry.file.filename) {
+                        try {
+                            const files = await bucket.find({ filename: entry.file.filename }).toArray();
+                            if (files.length > 0) {
+                                await bucket.delete(files[0]._id);
+                            }
+                        } catch (err) {
+                            console.error('Error deleting file from GridFS:', err);
+                        }
+                    }
+                }
+            }
+            
+            // Delete the work year
+            await WorkYear.findByIdAndDelete(workYear._id);
+        }
+
+        // Delete all processes for this program
+        await Process.deleteMany({ program: id });
 
         // Remove program from organization's programs list
         await Organization.findByIdAndUpdate(

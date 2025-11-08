@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import './OrganizationPage.css';
 import organizationService from './services/organizationService';
 import MemberManagement from './components/MemberManagement';
+import { isUserAdmin } from './services/membershipService';
 
 function OrganizationsPage({ onLogout, onOrganizationSelect, currentUser }) {
   const [organizations, setOrganizations] = useState([]);
@@ -9,6 +10,7 @@ function OrganizationsPage({ onLogout, onOrganizationSelect, currentUser }) {
   const [newOrgName, setNewOrgName] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [adminOrgs, setAdminOrgs] = useState(new Set());
   
   // Deletion confirmation states
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -38,6 +40,14 @@ function OrganizationsPage({ onLogout, onOrganizationSelect, currentUser }) {
       const response = await organizationService.getUserOrganizations(currentUser.username);
       if (response.success) {
         setOrganizations(response.organizations);
+        // Check admin status for all organizations
+        const adminSet = new Set();
+        await Promise.all(response.organizations.map(async (org) => {
+          if (await isUserAdmin(org._id, currentUser.username)) {
+            adminSet.add(org._id);
+          }
+        }));
+        setAdminOrgs(adminSet);
       } else {
         setError(response.message || 'Failed to load organizations');
       }
@@ -196,10 +206,6 @@ function OrganizationsPage({ onLogout, onOrganizationSelect, currentUser }) {
     setSuccess('');
   };
 
-  const isCreator = (org) => {
-    return org.creator && currentUser && org.creator.username === currentUser.username;
-  };
-
   const formatDate = (dateString) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
@@ -299,7 +305,7 @@ function OrganizationsPage({ onLogout, onOrganizationSelect, currentUser }) {
                       </div>
 
                       <div className="organization-actions">
-                        {isCreator(org) && (
+                        {adminOrgs.has(org._id) && (
                           <>
                             <button 
                               onClick={(e) => {

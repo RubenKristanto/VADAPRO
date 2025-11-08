@@ -3,6 +3,7 @@ import './ProgramPage.css';
 import programService from './services/programService';
 import workYearService from './services/workYearService';
 import { authService } from './services/authentication';
+import { isUserAdmin } from './services/membershipService';
 
 function ProgramsPage({ organization, onBack, onLogout, onYearSelect }) {
   const [programs, setPrograms] = useState([]);
@@ -51,6 +52,11 @@ function ProgramsPage({ organization, onBack, onLogout, onYearSelect }) {
   const [currentProgramForYear, setCurrentProgramForYear] = useState(null);
   const [newYear, setNewYear] = useState('');
 
+  // Year deletion states
+  const [showDeleteYearModal, setShowDeleteYearModal] = useState(false);
+  const [yearToDelete, setYearToDelete] = useState(null);
+  const [deleteYearConfirm, setDeleteYearConfirm] = useState('');
+
   const createProgram = async () => {
     if (!newProgramName.trim()) return;
     setIsLoading(true);
@@ -78,17 +84,20 @@ function ProgramsPage({ organization, onBack, onLogout, onYearSelect }) {
     setCurrentProgramForYear(program);
     setShowYearModal(true);
     setNewYear('');
+    setYearError('');
   };
 
   const closeYearModal = () => {
     setShowYearModal(false);
     setCurrentProgramForYear(null);
     setNewYear('');
+    setYearError('');
   };
 
   const addYear = async () => {
     setYearError('');
     if (!newYear.trim() || !currentProgramForYear) return;
+    if (isNaN(newYear.trim())) return setYearError('Must be year in number');
     setIsLoading(true);
     try {
       const resp = await workYearService.createWorkYear(currentProgramForYear._id, parseInt(newYear.trim(), 10));
@@ -112,22 +121,34 @@ function ProgramsPage({ organization, onBack, onLogout, onYearSelect }) {
     }
   };
 
-  const deleteYear = (programId, yearId, e) => {
+  const deleteYear = async (programId, yearId, yearValue, programName, e) => {
     e.stopPropagation();
-    const isPersisted = typeof yearId === 'string' && yearId.length === 24;
-    if (isPersisted) {
-      return alert('Deleting persisted work years is not supported in this UI.');
+    const user = authService.getCurrentUser();
+    if (!user || !(await isUserAdmin(organization._id, user.username))) return alert('Only admins can delete work years');
+    setYearToDelete({ programId, yearId, yearValue, programName });
+    setShowDeleteYearModal(true);
+    setDeleteYearConfirm('');
+  };
+
+  const confirmDeleteYear = async () => {
+    const expectedText = `${yearToDelete.programName}/${yearToDelete.yearValue}`;
+    if (deleteYearConfirm !== expectedText) return;
+    try {
+      const user = authService.getCurrentUser();
+      await workYearService.deleteWorkYear(yearToDelete.yearId, user.username);
+      const updatedPrograms = programs.map(program => {
+        if (program._id === yearToDelete.programId) {
+          return { ...program, years: program.years.filter(year => year.id !== yearToDelete.yearId) };
+        }
+        return program;
+      });
+      setPrograms(updatedPrograms);
+      setShowDeleteYearModal(false);
+      setYearToDelete(null);
+      setDeleteYearConfirm('');
+    } catch (err) {
+      alert(err.message || 'Failed to delete work year');
     }
-    const updatedPrograms = programs.map(program => {
-      if (program._id === programId) {
-        return {
-          ...program,
-          years: program.years.filter(year => year.id !== yearId)
-        };
-      }
-      return program;
-    });
-    setPrograms(updatedPrograms);
   };
 
   const initiateDelete = (program) => {
@@ -154,8 +175,15 @@ function ProgramsPage({ organization, onBack, onLogout, onYearSelect }) {
     setConfirmationStep('name');
   };
 
-  const finalDelete = () => {
-    setPrograms(programs.filter(program => program.id !== programToDelete.id));
+  const finalDelete = async () => {
+    const user = authService.getCurrentUser();
+    if (!user || !(await isUserAdmin(organization._id, user.username))) return alert('Only admins can delete programs');
+    try {
+      await programService.deleteProgram(programToDelete._id, user.username);
+      setPrograms(programs.filter(program => program._id !== programToDelete._id));
+    } catch (err) {
+      alert(err.message || 'Failed to delete program');
+    }
     cancelDelete();
   };
 
@@ -242,7 +270,7 @@ function ProgramsPage({ organization, onBack, onLogout, onYearSelect }) {
                             >
                               <span className="year-text">{year.year}</span>
                               <button 
-                                onClick={(e) => deleteYear(program._id, year.id, e)}
+                                onClick={(e) => deleteYear(program._id, year.id, year.year, program.name, e)}
                                 className="year-delete-btn"
                                 title="Delete Year"
                               >
@@ -335,6 +363,7 @@ function ProgramsPage({ organization, onBack, onLogout, onYearSelect }) {
               className="modal-input"
               autoFocus
             />
+            {yearError && <p style={{ color: 'red', fontSize: '0.85rem', marginTop: '0.5rem' }}>{yearError}</p>}
             <div className="modal-actions">
               <button onClick={closeYearModal} className="modal-cancel-btn">
                 Cancel
@@ -345,6 +374,38 @@ function ProgramsPage({ organization, onBack, onLogout, onYearSelect }) {
                 disabled={!newYear.trim()}
               >
                 Add Year
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Year Modal */}
+      {showDeleteYearModal && (
+        <div className="modal-overlay" onClick={() => { setShowDeleteYearModal(false); setYearToDelete(null); setDeleteYearConfirm(''); }}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <h3 className="modal-title">Delete Year</h3>
+            <p className="modal-description">
+              To confirm deletion, type "<strong>{yearToDelete?.programName}/{yearToDelete?.yearValue}</strong>":
+            </p>
+            <input
+              type="text"
+              placeholder={`Type ${yearToDelete?.programName}/${yearToDelete?.yearValue}`}
+              value={deleteYearConfirm}
+              onChange={(e) => setDeleteYearConfirm(e.target.value)}
+              className="modal-input"
+              autoFocus
+            />
+            <div className="modal-actions">
+              <button onClick={() => { setShowDeleteYearModal(false); setYearToDelete(null); setDeleteYearConfirm(''); }} className="modal-cancel-btn">
+                Cancel
+              </button>
+              <button 
+                onClick={confirmDeleteYear} 
+                className="modal-confirm-btn"
+                disabled={deleteYearConfirm !== `${yearToDelete?.programName}/${yearToDelete?.yearValue}`}
+              >
+                Delete
               </button>
             </div>
           </div>

@@ -27,4 +27,10 @@ router.put('/:id/entries/:entryId', workYearController.updateEntry);
 // Download file from GridFS
 router.get('/files/:fileId', workYearController.downloadFile);
 
+// Delete work year (admin only)
+router.delete('/:id', workYearController.deleteWorkYear);
+
+// Delete entry
+router.delete('/:id/entries/:entryId', workYearController.deleteEntry);
+
 module.exports = router;
