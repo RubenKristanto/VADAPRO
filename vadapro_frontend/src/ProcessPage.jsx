@@ -207,18 +207,13 @@ function ProcessPage({ entry, program, year, onBack, onLogout, organization }) {
                 
                 const statsData = {};
                 process.selectedStats.forEach(stat => {
-                  if (stat.calculatedValue !== null && stat.calculatedValue !== undefined) {
-                    statsData[stat.statId] = stat.calculatedValue;
+                  if (stat.calculatedValues) {
+                    Object.entries(stat.calculatedValues).forEach(([columnName, value]) => {
+                      const key = columnName === 'default' ? stat.statId : `${columnName}|${stat.statId}`;
+                      statsData[key] = value;
+                    });
                   }
                 });
-                
-                if (process.statisticsData) {
-                  Object.entries(process.statisticsData).forEach(([key, value]) => {
-                    if (value !== null && value !== undefined) {
-                      statsData[key] = value;
-                    }
-                  });
-                }
                 
                 setStatisticsData(statsData);
               }
@@ -297,55 +292,58 @@ function ProcessPage({ entry, program, year, onBack, onLogout, organization }) {
         return;
       }
       
-      const firstCol = csvData[numericCols[0]];
-      console.log('Using column:', numericCols[0], 'with', firstCol.values.length, 'values');
-      
-      selectedStats.forEach(statId => {
-        try {
-          switch(statId) {
-            case 'mean': results[statId] = firstCol.mean().toFixed(2); break;
-            case 'median': results[statId] = firstCol.median().toFixed(2); break;
-            case 'std': results[statId] = firstCol.std().toFixed(2); break;
-            case 'variance': results[statId] = firstCol.var().toFixed(2); break;
-            case 'min': results[statId] = firstCol.min().toFixed(2); break;
-            case 'max': results[statId] = firstCol.max().toFixed(2); break;
-            case 'sum': results[statId] = firstCol.sum().toFixed(2); break;
-            case 'count': results[statId] = firstCol.count(); break;
-            case 'nunique': results[statId] = firstCol.nUnique(); break;
-            case 'range': results[statId] = (firstCol.max() - firstCol.min()).toFixed(2); break;
-            case 'q1': results[statId] = quantile(firstCol, 0.25).toFixed(2); break;
-            case 'q2': results[statId] = quantile(firstCol, 0.5).toFixed(2); break;
-            case 'q3': results[statId] = quantile(firstCol, 0.75).toFixed(2); break;
-            case 'iqr': results[statId] = (quantile(firstCol, 0.75) - quantile(firstCol, 0.25)).toFixed(2); break;
-            case 'p10': results[statId] = quantile(firstCol, 0.1).toFixed(2); break;
-            case 'p90': results[statId] = quantile(firstCol, 0.9).toFixed(2); break;
-            case 'p95': results[statId] = quantile(firstCol, 0.95).toFixed(2); break;
-            case 'p99': results[statId] = quantile(firstCol, 0.99).toFixed(2); break;
-            case 'abs_sum': results[statId] = firstCol.abs().sum().toFixed(2); break;
-            case 'abs_mean': results[statId] = firstCol.abs().mean().toFixed(2); break;
-            case 'cumsum': results[statId] = firstCol.cumSum().values[firstCol.values.length - 1].toFixed(2); break;
-            case 'cummax': results[statId] = firstCol.cumMax().values[firstCol.values.length - 1].toFixed(2); break;
-            case 'cummin': results[statId] = firstCol.cumMin().values[firstCol.values.length - 1].toFixed(2); break;
-            case 'cumprod': results[statId] = firstCol.cumProd().values[firstCol.values.length - 1].toFixed(2); break;
-            case 'skew': results[statId] = skew(firstCol).toFixed(2); break;
-            case 'kurtosis': results[statId] = kurt(firstCol).toFixed(2); break;
-            case 'mode': {
-              const valueCounts = firstCol.valueCounts();
-              results[statId] = valueCounts.index[0];
-              break;
+      numericCols.forEach(colName => {
+        const col = csvData[colName];
+        console.log('Processing column:', colName, 'with', col.values.length, 'values');
+        
+        selectedStats.forEach(statId => {
+          const key = numericCols.length > 1 ? `${colName}|${statId}` : statId;
+          try {
+            switch(statId) {
+              case 'mean': results[key] = col.mean().toFixed(2); break;
+              case 'median': results[key] = col.median().toFixed(2); break;
+              case 'std': results[key] = col.std().toFixed(2); break;
+              case 'variance': results[key] = col.var().toFixed(2); break;
+              case 'min': results[key] = col.min().toFixed(2); break;
+              case 'max': results[key] = col.max().toFixed(2); break;
+              case 'sum': results[key] = col.sum().toFixed(2); break;
+              case 'count': results[key] = col.count(); break;
+              case 'nunique': results[key] = col.nUnique(); break;
+              case 'range': results[key] = (col.max() - col.min()).toFixed(2); break;
+              case 'q1': results[key] = quantile(col, 0.25).toFixed(2); break;
+              case 'q2': results[key] = quantile(col, 0.5).toFixed(2); break;
+              case 'q3': results[key] = quantile(col, 0.75).toFixed(2); break;
+              case 'iqr': results[key] = (quantile(col, 0.75) - quantile(col, 0.25)).toFixed(2); break;
+              case 'p10': results[key] = quantile(col, 0.1).toFixed(2); break;
+              case 'p90': results[key] = quantile(col, 0.9).toFixed(2); break;
+              case 'p95': results[key] = quantile(col, 0.95).toFixed(2); break;
+              case 'p99': results[key] = quantile(col, 0.99).toFixed(2); break;
+              case 'abs_sum': results[key] = col.abs().sum().toFixed(2); break;
+              case 'abs_mean': results[key] = col.abs().mean().toFixed(2); break;
+              case 'cumsum': results[key] = col.cumSum().values[col.values.length - 1].toFixed(2); break;
+              case 'cummax': results[key] = col.cumMax().values[col.values.length - 1].toFixed(2); break;
+              case 'cummin': results[key] = col.cumMin().values[col.values.length - 1].toFixed(2); break;
+              case 'cumprod': results[key] = col.cumProd().values[col.values.length - 1].toFixed(2); break;
+              case 'skew': results[key] = skew(col).toFixed(2); break;
+              case 'kurtosis': results[key] = kurt(col).toFixed(2); break;
+              case 'mode': {
+                const valueCounts = col.valueCounts();
+                results[key] = valueCounts.index[0];
+                break;
+              }
+              default: results[key] = 'N/A';
             }
-            default: results[statId] = 'N/A';
+            
+            if (processId && results[key] !== undefined) {
+              processService.updateStatValue(processId, key, results[key]).catch(err => 
+                console.error('Error updating stat:', err)
+              );
+            }
+          } catch (e) {
+            console.error(`Error calculating ${statId} for ${colName}:`, e.message);
+            results[key] = 'Error';
           }
-          
-          if (processId && results[statId] !== undefined) {
-            processService.updateStatValue(processId, statId, results[statId]).catch(err => 
-              console.error('Error updating stat:', err)
-            );
-          }
-        } catch (e) {
-          console.error(`Error calculating ${statId}:`, e.message);
-          results[statId] = 'Error';
-        }
+        });
       });
       
       console.log('Statistics calculated:', results);
@@ -771,18 +769,33 @@ function ProcessPage({ entry, program, year, onBack, onLogout, organization }) {
                         <div className="info-divider"></div>
                         {selectedStats.map(statId => {
                           const stat = getStatById(statId);
-                          return stat ? (
+                          if (!stat) return null;
+                          
+                          const relevantKeys = Object.keys(statisticsData).filter(key => 
+                            key === statId || key.endsWith(`|${statId}`)
+                          );
+                          
+                          const displayValue = relevantKeys.length === 0 
+                            ? 'Calculating...'
+                            : relevantKeys.map(key => {
+                                const columnName = key.includes('|') ? key.split('|')[0] : null;
+                                return columnName 
+                                  ? `(${columnName}): ${statisticsData[key]}`
+                                  : statisticsData[key];
+                              });
+                          
+                          return (
                             <div key={statId} className="info-item stat-item">
                               <span className="info-label">
                                 {stat.icon} {stat.label}:
                               </span>
                               <span className="info-value stat-value">
-                                {statisticsData[statId] !== undefined 
-                                  ? statisticsData[statId] 
-                                  : 'Calculating...'}
+                                {Array.isArray(displayValue) ? displayValue.map((val, idx) => (
+                                  <div key={idx}>{val}</div>
+                                )) : displayValue}
                               </span>
                             </div>
-                          ) : null;
+                          );
                         })}
                       </>
                     )}

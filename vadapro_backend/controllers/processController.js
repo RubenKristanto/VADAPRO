@@ -421,11 +421,6 @@ exports.removeSelectedStat = async (req, res) => {
 
         process.selectedStats = process.selectedStats.filter(s => s.statId !== statId);
 
-        // Also remove from statisticsData map
-        if (process.statisticsData.has(statId)) {
-            process.statisticsData.delete(statId);
-        }
-
         await process.save();
 
         res.status(200).json({
@@ -472,19 +467,14 @@ exports.updateStatValue = async (req, res) => {
             });
         }
 
-        const stat = process.selectedStats.find(s => s.statId === statId);
-        if (!stat) {
-            return res.status(404).json({
-                success: false,
-                message: 'Selected statistic not found'
-            });
+        const baseStatId = statId.includes('|') ? statId.split('|')[1] : statId;
+        const columnName = statId.includes('|') ? statId.split('|')[0] : 'default';
+        const stat = process.selectedStats.find(s => s.statId === baseStatId);
+        
+        if (stat) {
+            stat.calculatedValues.set(columnName, value);
+            stat.calculatedAt = new Date();
         }
-
-        stat.calculatedValue = value;
-        stat.calculatedAt = new Date();
-
-        // Also update in statisticsData map
-        process.statisticsData.set(statId, value);
 
         await process.save();
 

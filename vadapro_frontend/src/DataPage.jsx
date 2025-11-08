@@ -141,7 +141,7 @@ function DataPage({ program, year, onBack, onLogout, onNavigateToProcess }) {
 
   const finalDelete = async () => {
     try {
-      if (workYearData && workYearData._id && entryToDelete._id) {
+      if (workYearData && workYearData._id && entryToDelete.id) {
         await workYearService.deleteEntry(workYearData._id, entryToDelete.id);
         const single = await workYearService.getWorkYearById(workYearData._id);
         if (single && single.success) setEntries(mapEntriesFromWorkYear(single.workYear));

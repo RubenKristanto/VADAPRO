@@ -7,7 +7,7 @@ npm install express
 This backend is built with Node.js, Express, and MongoDB (using Mongoose). It provides user authentication (register and login) with secure password hashing.
 
 ## Technologies Used
-- Node.js
+- Node.js (version 22.21.1 via nvm)
 - Express
 - MongoDB (with Mongoose)
 - bcryptjs (for password hashing)

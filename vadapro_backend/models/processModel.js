@@ -47,9 +47,10 @@ const selectedStatSchema = new mongoose.Schema({
         type: String,
         trim: true
     },
-    calculatedValue: {
-        type: mongoose.Schema.Types.Mixed,
-        default: null
+    calculatedValues: {
+        type: Map,
+        of: mongoose.Schema.Types.Mixed,
+        default: new Map()
     },
     calculatedAt: {
         type: Date
@@ -139,13 +140,6 @@ const processSchema = new mongoose.Schema({
     
     // Statistical parameters
     selectedStats: [selectedStatSchema],
-    
-    // Statistics summary
-    statisticsData: {
-        type: Map,
-        of: mongoose.Schema.Types.Mixed,
-        default: new Map()
-    },
     
     // AI Chat interface
     chatMessages: [chatMessageSchema],

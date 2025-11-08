@@ -275,10 +275,7 @@ exports.deleteProgram = async (req, res) => {
                 for (const entry of workYear.entries) {
                     if (entry.file && entry.file.filename) {
                         try {
-                            const files = await bucket.find({ filename: entry.file.filename }).toArray();
-                            if (files.length > 0) {
-                                await bucket.delete(files[0]._id);
-                            }
+                            await bucket.delete(new mongoose.Types.ObjectId(entry.file.filename));
                         } catch (err) {
                             console.error('Error deleting file from GridFS:', err);
                         }

@@ -44,4 +44,5 @@ result : tailwind features can be used inside the project. Dont forget to change
 ### npm libraries added
 ```
 npm install axios
+npm install danfojs@1.2.0
 ```

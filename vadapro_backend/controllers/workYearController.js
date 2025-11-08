@@ -203,10 +203,7 @@ exports.deleteWorkYear = async (req, res) => {
       for (const entry of workYear.entries) {
         if (entry.file && entry.file.filename) {
           try {
-            const files = await bucket.find({ filename: entry.file.filename }).toArray();
-            if (files.length > 0) {
-              await bucket.delete(files[0]._id);
-            }
+            await bucket.delete(new mongoose.Types.ObjectId(entry.file.filename));
           } catch (err) {
             console.error('Error deleting file from GridFS:', err);
           }
@@ -230,6 +227,19 @@ exports.deleteEntry = async (req, res) => {
     if (!mongoose.Types.ObjectId.isValid(entryId)) return res.status(400).json({ success: false, message: 'Invalid entry id' });
     const workYear = await WorkYear.findById(id);
     if (!workYear) return res.status(404).json({ success: false, message: 'Work year not found' });
+    
+    const entry = workYear.entries.id(entryId);
+    if (entry && entry.file && entry.file.filename) {
+      const bucket = new GridFSBucket(mongoose.connection.db, { bucketName: 'upload' });
+      try {
+        await bucket.delete(new mongoose.Types.ObjectId(entry.file.filename));
+      } catch (err) {
+        console.error('Error deleting file from GridFS:', err);
+      }
+    }
+    
+    await Process.deleteMany({ entry: entryId });
+    
     workYear.entries = workYear.entries.filter(e => e._id.toString() !== entryId);
     await workYear.save();
     res.status(200).json({ success: true, message: 'Entry deleted', workYear });
