@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import './ProcessPage.css';
 import processService from './services/processService';
 import * as dfd from 'danfojs';
+import DynamicChart from './components/DynamicChart';
 
 // Backend interface: GET /file/gridfs/:entryId returns CSV file from MongoDB GridFS
 
@@ -673,6 +674,11 @@ function ProcessPage({ entry, program, year, onBack, onLogout, organization }) {
                     alt="Process visualization" 
                     className="process-image"
                   />
+                ) : processId ? (
+                  // Render DynamicChart when a process exists. The component will fetch CSV via processService.getCsvData(processId).
+                  <div style={{ width: '100%', height: '100%' }}>
+                      <DynamicChart processId={processId} entryId={entry?._id || entry?.id} style={{ width: '100%', height: '100%' }} />
+                  </div>
                 ) : (
                   <div className="placeholder-content">
                     <div className="placeholder-icon">🖼️</div>
