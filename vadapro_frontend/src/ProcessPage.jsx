@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import './ProcessPage.css';
 import processService from './services/processService';
+import aiService from './services/aiService';
 import * as dfd from 'danfojs';
 import DynamicChart from './components/DynamicChart';
 
@@ -227,7 +228,7 @@ function ProcessPage({ entry, program, year, onBack, onLogout, organization }) {
         
         const processData = {
           name: entry.name || 'Test Process',
-          sourceFile: entry.sourceFile || '',
+          sourceFileName: entry.sourceFile || '',
           responseCount: entry.responseCount || 0,
           rawData: entry.data || null,
           entryId: entryId,
@@ -427,26 +428,58 @@ function ProcessPage({ entry, program, year, onBack, onLogout, organization }) {
   };
 
   // ============================================
-  // TODO: INSERT GEMINI API INTEGRATION LOGIC HERE
+  // GEMINI API INTEGRATION
   // ============================================
-  // Function to send message to Gemini AI
   const sendMessageToGemini = async (message) => {
-    // MOCK RESPONSE - Remove this when implementing actual Gemini API
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        const mockResponses = [
-          `That's a great question about ${entry?.name}! Based on the data analysis, I can help you understand the patterns and trends.`,
-          `I've analyzed your request. With the ${selectedStats.length} statistical parameters you've selected, I can provide detailed insights into your ${program?.name} dataset.`,
-          `Interesting observation! Let me break this down for you. The current process is at ${progress}% completion, and the data shows some fascinating characteristics.`,
-          `Great question! In the context of ${program?.name} (${year}), this is particularly relevant. Let me explain the key points.`,
-          `I can help with that! Your dataset contains valuable information. The statistics you've selected will give us a comprehensive view of the data distribution.`,
-        ];
-        resolve(mockResponses[Math.floor(Math.random() * mockResponses.length)]);
-      }, 1500); // Simulate API delay
-    });
+    try {
+      const context = {
+        statistics: statisticsData,
+        chartConfig: { type: 'current visualization', columns: csvData?.columns || [] },
+        csvSummary: csvData ? {
+          totalRows: csvData.shape[0],
+          totalColumns: csvData.shape[1],
+          columns: csvData.columns,
+          numericColumns: csvData.columns.filter(col => csvData[col].dtype === 'float32' || csvData[col].dtype === 'int32')
+        } : null,
+        entryName: entry?.name,
+        sourceFileName: entry?.sourceFile,
+        processId: processId,
+        responseCount: entry?.responseCount,
+        programName: program?.name,
+        organizationName: organization?.name,
+        year: year,
+        userId: localStorage.getItem('username'),
+        queryLength: message.length
+      };
+
+      // Call AI service
+      const response = await aiService.analyzeData(message, context);
+      
+      if (response.success) {
+        console.log('✅ AI Response received:', {
+          tokens: response.metadata?.totalTokens,
+          model: response.metadata?.model
+        });
+        return response.response;
+      } else {
+        // Handle different error types
+        if (response.errorType === 'RATE_LIMIT') {
+          return '⏱️ Rate limit reached. Please wait a moment before sending another message.';
+        } else if (response.errorType === 'QUOTA_EXCEEDED') {
+          return '📊 Daily quota exceeded. The AI service will be available again tomorrow.';
+        } else if (response.errorType === 'CONFIG_ERROR') {
+          return '⚙️ AI service is not configured. Please contact the administrator.';
+        } else {
+          return '❌ Sorry, I encountered an error. Please try again.';
+        }
+      }
+    } catch (error) {
+      console.error('❌ AI service error:', error);
+      return '❌ Unable to connect to AI service. Please check your connection and try again.';
+    }
   };
   // ============================================
-  // END OF GEMINI API INTEGRATION LOGIC
+  // END OF GEMINI API INTEGRATION
   // ============================================
 
   // Handle sending a chat message

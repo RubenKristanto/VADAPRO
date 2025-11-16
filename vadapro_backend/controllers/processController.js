@@ -9,7 +9,7 @@ exports.createProcess = async (req, res) => {
     try {
         const {
             name,
-            sourceFile,
+            sourceFileName,
             responseCount,
             rawData,
             entryId,
@@ -38,7 +38,7 @@ exports.createProcess = async (req, res) => {
         // Create the process
         const process = new Process({
             name: name.trim(),
-            sourceFile: sourceFile ? sourceFile.trim() : undefined,
+            sourceFileName: sourceFileName ? sourceFileName.trim() : undefined,
             responseCount: responseCount || 0,
             rawData: rawData || null,
             entry: entryId,
@@ -147,7 +147,7 @@ exports.updateProcess = async (req, res) => {
 
         // Update allowed fields
         const allowedUpdates = [
-            'name', 'sourceFile', 'responseCount', 'rawData', 'processedData',
+            'name', 'sourceFileName', 'responseCount', 'rawData', 'processedData',
             'imageUrl', 'imageStoragePath', 'processStatus', 'progress',
             'year', 'tags', 'danfoConfig', 'processingConfig',
             'errorMessage', 'errorStack'
