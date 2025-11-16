@@ -9,4 +9,7 @@ router.post('/analyze', aiController.analyzeData);
 // GET /ai/usage - Get current API usage statistics
 router.get('/usage', aiController.getUsageStats);
 
+// GET /ai/model - Get model name
+router.get('/model', aiController.getModelName);
+
 module.exports = router;

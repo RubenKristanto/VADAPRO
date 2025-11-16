@@ -38,6 +38,16 @@ class AIService {
     }
   }
 
+  // Get model name
+  async getModelName() {
+    try {
+      const response = await axiosAPI.get('/ai/model');
+      return response.data;
+    } catch (error) {
+      return this.handleError(error);
+    }
+  }
+
   // Error handling
   handleError(error) {
     if (error.response) {

@@ -3,8 +3,15 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 // Initialize Gemini AI with API key from environment
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
+// Centralized model configuration
+const MODEL_NAME = 'gemini-2.5-flash-lite';
+
 // Rate limiting store (in-memory, replace with Redis for production)
 const rateLimitStore = new Map();
+
+// Request queue for handling RPM limits
+const requestQueue = [];
+let isProcessingQueue = false;
 
 // Token usage tracking
 let totalTokensToday = 0;
@@ -46,26 +53,29 @@ const checkRateLimit = (userId) => {
   // Clean up requests older than 1 minute
   userData.requests = userData.requests.filter(timestamp => now - timestamp < 60000);
   
-  // Check per-minute limit
+  // Check per-minute limit - return shouldQueue instead of error
   if (userData.requests.length >= RATE_LIMITS.requestsPerMinute) {
     return {
       allowed: false,
-      error: `Rate limit exceeded. Max ${RATE_LIMITS.requestsPerMinute} requests per minute.`
+      shouldQueue: true,
+      error: `Rate limit exceeded. Request queued.`
     };
   }
   
-  // Check daily limit
+  // Check daily limit - don't queue, reject immediately
   if (userData.dailyRequests >= RATE_LIMITS.requestsPerDay) {
     return {
       allowed: false,
+      shouldQueue: false,
       error: `Daily limit reached. Max ${RATE_LIMITS.requestsPerDay} requests per day.`
     };
   }
   
-  // Check global daily token limit
+  // Check global daily token limit - don't queue, reject immediately
   if (totalTokensToday >= RATE_LIMITS.maxTokensPerDay) {
     return {
       allowed: false,
+      shouldQueue: false,
       error: 'System token quota nearly exhausted. Please try again later.'
     };
   }
@@ -75,7 +85,7 @@ const checkRateLimit = (userId) => {
   userData.dailyRequests++;
   totalRequestsToday++;
   
-  return { allowed: true };
+  return { allowed: true, shouldQueue: false };
 };
 
 // Sanitize data before sending to Gemini
@@ -121,6 +131,92 @@ const logUsage = (inputTokens, outputTokens, requestType) => {
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
 };
 
+// Process queued requests
+const processQueue = async () => {
+  if (isProcessingQueue || requestQueue.length === 0) return;
+  
+  isProcessingQueue = true;
+  console.log(`📬 Processing queue: ${requestQueue.length} requests pending`);
+  
+  while (requestQueue.length > 0) {
+    const queuedRequest = requestQueue[0];
+    const { userId } = queuedRequest;
+    
+    // Check if we can process this request now
+    const rateLimitCheck = checkRateLimit(userId);
+    
+    if (rateLimitCheck.allowed) {
+      // Remove from queue
+      const request = requestQueue.shift();
+      console.log(`✅ Processing queued request for user: ${userId}`);
+      
+      // Process the request
+      try {
+        await executeRequest(request);
+      } catch (error) {
+        console.error('❌ Error processing queued request:', error.message);
+        request.reject(error);
+      }
+    } else if (!rateLimitCheck.shouldQueue) {
+      // Daily limit reached, reject all remaining requests
+      const request = requestQueue.shift();
+      console.log(`❌ Rejecting queued request: ${rateLimitCheck.error}`);
+      request.reject(new Error(rateLimitCheck.error));
+    } else {
+      // Still rate limited, wait for next cycle
+      break;
+    }
+  }
+  
+  isProcessingQueue = false;
+};
+
+// Execute a single AI request
+const executeRequest = async ({ query, statistics, chartConfig, csvSummary, context, resolve, reject }) => {
+  try {
+    // Sanitize data
+    const sanitizedStats = sanitizeData(statistics);
+    const sanitizedCsv = sanitizeData(csvSummary);
+    
+    // Build context for Gemini
+    const contextPrompt = buildContextPrompt(query, sanitizedStats, chartConfig, sanitizedCsv, context);
+    
+    // Call Gemini API
+    const model = genAI.getGenerativeModel({ model: MODEL_NAME });
+    
+    const result = await model.generateContent(contextPrompt);
+    const response = await result.response;
+    const text = response.text();
+    
+    // Extract token usage
+    const usageMetadata = response.usageMetadata || {};
+    const inputTokens = usageMetadata.promptTokenCount || 0;
+    const outputTokens = usageMetadata.candidatesTokenCount || 0;
+    
+    // Log usage to console
+    logUsage(inputTokens, outputTokens, 'Data Analysis');
+    
+    resolve({
+      success: true,
+      response: text,
+      metadata: {
+        inputTokens,
+        outputTokens,
+        totalTokens: inputTokens + outputTokens,
+        model: MODEL_NAME,
+        timestamp: new Date().toISOString()
+      }
+    });
+  } catch (error) {
+    reject(error);
+  }
+};
+
+// Start queue processor - runs every 5 seconds
+setInterval(() => {
+  processQueue();
+}, 5000);
+
 // Main analyze endpoint
 exports.analyzeData = async (req, res) => {
   try {
@@ -139,46 +235,74 @@ exports.analyzeData = async (req, res) => {
     const rateLimitCheck = checkRateLimit(userId);
     
     if (!rateLimitCheck.allowed) {
-      return res.status(429).json({
-        success: false,
-        message: rateLimitCheck.error,
-        errorType: 'RATE_LIMIT'
-      });
+      if (rateLimitCheck.shouldQueue) {
+        // Add to queue for per-minute limit
+        console.log(`📥 Queueing request for user: ${userId}, Queue size: ${requestQueue.length + 1}`);
+        
+        return new Promise((resolve, reject) => {
+          requestQueue.push({
+            query,
+            statistics,
+            chartConfig,
+            csvSummary,
+            context,
+            userId,
+            resolve: (result) => res.json(result),
+            reject: (error) => {
+              console.error('❌ Queued request error:', error.message);
+              if (error.message.includes('Daily limit')) {
+                res.status(429).json({
+                  success: false,
+                  message: error.message,
+                  errorType: 'RATE_LIMIT'
+                });
+              } else if (error.message.includes('API_KEY')) {
+                res.status(500).json({
+                  success: false,
+                  message: 'AI service configuration error. Please contact administrator.',
+                  errorType: 'CONFIG_ERROR'
+                });
+              } else if (error.message.includes('quota')) {
+                res.status(429).json({
+                  success: false,
+                  message: 'AI service quota exceeded. Please try again later.',
+                  errorType: 'QUOTA_EXCEEDED'
+                });
+              } else {
+                res.status(500).json({
+                  success: false,
+                  message: 'Failed to analyze data. Please try again.',
+                  errorType: 'SERVER_ERROR'
+                });
+              }
+            }
+          });
+          
+          // Trigger queue processing
+          processQueue();
+        });
+      } else {
+        // Daily limit or token limit - reject immediately
+        return res.status(429).json({
+          success: false,
+          message: rateLimitCheck.error,
+          errorType: 'RATE_LIMIT'
+        });
+      }
     }
     
-    // Sanitize data
-    const sanitizedStats = sanitizeData(statistics);
-    const sanitizedCsv = sanitizeData(csvSummary);
-    
-    // Build context for Gemini
-    const contextPrompt = buildContextPrompt(query, sanitizedStats, chartConfig, sanitizedCsv, context);
-    
-    // Call Gemini API
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-lite' });
-    
-    const result = await model.generateContent(contextPrompt);
-    const response = await result.response;
-    const text = response.text();
-    
-    // Extract token usage
-    const usageMetadata = response.usageMetadata || {};
-    const inputTokens = usageMetadata.promptTokenCount || 0;
-    const outputTokens = usageMetadata.candidatesTokenCount || 0;
-    
-    // Log usage to console
-    logUsage(inputTokens, outputTokens, 'Data Analysis');
-    
-    res.json({
-      success: true,
-      response: text,
-      metadata: {
-        inputTokens,
-        outputTokens,
-        totalTokens: inputTokens + outputTokens,
-        model: 'gemini-2.5-flash-lite',
-        timestamp: new Date().toISOString()
-      }
+    // Process immediately if rate limit not exceeded
+    const result = await executeRequest({
+      query,
+      statistics,
+      chartConfig,
+      csvSummary,
+      context,
+      resolve: (data) => data,
+      reject: (error) => { throw error; }
     });
+    
+    res.json(result);
     
   } catch (error) {
     console.error('❌ AI Analysis Error:', error.message);
@@ -272,3 +396,6 @@ exports.getUsageStats = async (req, res) => {
     });
   }
 };
+
+// Get model name
+exports.getModelName = (req, res) => res.json({ success: true, model: MODEL_NAME });

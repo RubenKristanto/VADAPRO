@@ -13,6 +13,7 @@ This backend is built with Node.js, Express, and MongoDB (using Mongoose). It pr
 - bcryptjs (for password hashing)
 - dotenv (for environment variables)
 - body-parser, cors
+- @google/generative-ai
 
 ## Project Structure
 

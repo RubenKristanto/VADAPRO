@@ -57,16 +57,10 @@ function ProcessPage({ entry, program, year, onBack, onLogout, organization }) {
   const [selectedCategory, setSelectedCategory] = useState('all');
   
   // Chat interface state for Gemini AI
-  const [chatMessages, setChatMessages] = useState([
-    {
-      id: 1,
-      type: 'ai',
-      content: 'Hello! I\'m your AI assistant powered by Gemini 2.5 Flash. I can help you analyze your data, explain statistics, and answer questions about your process. How can I help you today?',
-      timestamp: new Date()
-    }
-  ]);
+  const [chatMessages, setChatMessages] = useState([]);
   const [userInput, setUserInput] = useState('');
   const [isAiTyping, setIsAiTyping] = useState(false);
+  const [modelName, setModelName] = useState('AI');
   
   // Comprehensive list of statistical parameters available in danfo.js
   // Organized by category for better UX
@@ -164,6 +158,19 @@ function ProcessPage({ entry, program, year, onBack, onLogout, organization }) {
       return matchesSearch && matchesCategory;
     });
   };
+
+  // Fetch model name and set initial message
+  useEffect(() => {
+    aiService.getModelName().then(data => {
+      if (data.success) setModelName(data.model);
+    });
+    setChatMessages([{
+      id: 1,
+      type: 'ai',
+      content: 'Hello! How can I help you today?',
+      timestamp: new Date()
+    }]);
+  }, []);
 
   // ============================================
   // INITIALIZE PROCESS AND FETCH DATA FROM BACKEND
@@ -866,7 +873,7 @@ function ProcessPage({ entry, program, year, onBack, onLogout, organization }) {
                       <span className="chat-icon">🤖</span>
                       <div>
                         <h3>AI Assistant</h3>
-                        <p className="chat-subtitle">Powered by Gemini 2.5 Flash</p>
+                        <p className="chat-subtitle">Powered by {modelName}</p>
                       </div>
                     </div>
                     <button 
