@@ -11,6 +11,7 @@ class AIService {
         statistics: context.statistics || {},
         chartConfig: context.chartConfig || null,
         csvSummary: context.csvSummary || null,
+        csvData: context.csvData || null,
         context: {
           entryName: context.entryName,
           sourceFileName: context.sourceFileName,

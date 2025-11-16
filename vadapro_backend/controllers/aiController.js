@@ -1,4 +1,7 @@
 const { GoogleGenerativeAI } = require('@google/generative-ai');
+const WorkYear = require('../models/workYearModel');
+const mongoose = require('mongoose');
+const { GridFSBucket } = require('mongodb');
 
 // Initialize Gemini AI with API key from environment
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
@@ -172,16 +175,12 @@ const processQueue = async () => {
 };
 
 // Execute a single AI request
-const executeRequest = async ({ query, statistics, chartConfig, csvSummary, context, resolve, reject }) => {
+const executeRequest = async ({ query, statistics, chartConfig, csvSummary, csvData, context, resolve, reject }) => {
   try {
-    // Sanitize data
     const sanitizedStats = sanitizeData(statistics);
     const sanitizedCsv = sanitizeData(csvSummary);
     
-    // Build context for Gemini
-    const contextPrompt = buildContextPrompt(query, sanitizedStats, chartConfig, sanitizedCsv, context);
-    
-    // Call Gemini API
+    const contextPrompt = buildContextPrompt(query, sanitizedStats, chartConfig, sanitizedCsv, csvData, context);
     const model = genAI.getGenerativeModel({ model: MODEL_NAME });
     
     const result = await model.generateContent(contextPrompt);
@@ -220,8 +219,9 @@ setInterval(() => {
 // Main analyze endpoint
 exports.analyzeData = async (req, res) => {
   try {
-    const { query, statistics, chartConfig, csvSummary, context } = req.body;
+    const { query, statistics, chartConfig, csvSummary, csvData, context } = req.body;
     console.log('Context received (analyzeData):', JSON.stringify(context, null, 2));
+    console.log('CSV Data from frontend:', csvData ? `${csvData.length} characters` : 'null');
     
     if (!query || query.trim().length === 0) {
       return res.status(400).json({ 
@@ -245,6 +245,7 @@ exports.analyzeData = async (req, res) => {
             statistics,
             chartConfig,
             csvSummary,
+            csvData,
             context,
             userId,
             resolve: (result) => res.json(result),
@@ -292,17 +293,9 @@ exports.analyzeData = async (req, res) => {
     }
     
     // Process immediately if rate limit not exceeded
-    const result = await executeRequest({
-      query,
-      statistics,
-      chartConfig,
-      csvSummary,
-      context,
-      resolve: (data) => data,
-      reject: (error) => { throw error; }
+    await new Promise((resolve, reject) => {
+      executeRequest({ query, statistics, chartConfig, csvSummary, csvData, context, userId, resolve: (result) => { res.json(result); resolve(); }, reject });
     });
-    
-    res.json(result);
     
   } catch (error) {
     console.error('❌ AI Analysis Error:', error.message);
@@ -333,11 +326,14 @@ exports.analyzeData = async (req, res) => {
 };
 
 // Build comprehensive context prompt for Gemini
-const buildContextPrompt = (query, statistics, chartConfig, csvSummary, context) => {
+const buildContextPrompt = (query, statistics, chartConfig, csvSummary, csvData, context) => {
   const isSimple = query.length < 50 && /what|name|how many|which|when|where/i.test(query);
   const maxWords = query.length < 30 ? 50 : query.length < 100 ? 150 : 300;
 
   console.log('Context received (buildContextPrompt):', JSON.stringify(context, null, 2));
+  console.log('CSV Data present:', csvData ? `Yes (${csvData.length} chars)` : 'No');
+  console.log('CSV Data: ', `${csvData}`);
+  console.log('CSV Summary present:', csvSummary ? 'Yes' : 'No');
   
   let prompt = `You are a concise data analyst. Answer directly matching question complexity. For factual questions, give brief answers. For analysis, stay focused.
 
@@ -356,7 +352,9 @@ USER QUERY: ${query}
     if (context.year) prompt += `- Year: ${context.year}\n\n`;
   }
 
-  if (csvSummary) {
+  if (csvData) {
+    prompt += `SURVEY DATA:\n${csvData}\n`;
+  } else if (csvSummary) {
     prompt += `DATA: ${csvSummary.totalRows} rows, ${csvSummary.totalColumns} columns\n`;
     if (csvSummary.columns) prompt += `Columns: ${csvSummary.columns.join(', ')}\n\n`;
   }

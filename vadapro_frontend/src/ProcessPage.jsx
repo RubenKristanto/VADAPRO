@@ -3,6 +3,7 @@ import './ProcessPage.css';
 import processService from './services/processService';
 import aiService from './services/aiService';
 import * as dfd from 'danfojs';
+import Papa from 'papaparse';
 import DynamicChart from './components/DynamicChart';
 
 // Backend interface: GET /file/gridfs/:entryId returns CSV file from MongoDB GridFS
@@ -41,6 +42,7 @@ function ProcessPage({ entry, program, year, onBack, onLogout, organization }) {
   const [imageUrl, setImageUrl] = useState(null);
   const [initError, setInitError] = useState(null);
   const [csvData, setCsvData] = useState(null); // DataFrame from CSV
+  const [rawCsvText, setRawCsvText] = useState(null); // Raw CSV text for AI analysis
   
   // Handler to clear current process and go back
   const handleBack = () => {
@@ -280,6 +282,32 @@ function ProcessPage({ entry, program, year, onBack, onLogout, organization }) {
     fetchCsvData();
   }, [entry]);
   
+  // Fetch raw CSV text separately for AI analysis (does not interfere with danfojs)
+  useEffect(() => {
+    const fetchRawCsv = async () => {
+      if (!entry?._id && !entry?.id) return;
+      try {
+        const entryId = entry._id || entry.id;
+        const csvUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/file/gridfs/${entryId}`;
+        const response = await fetch(csvUrl);
+        const text = await response.text();
+        
+        const parsed = Papa.parse(text, { header: true, skipEmptyLines: true });
+        const formatted = Object.keys(parsed.data[0] || {}).map((header, idx) => {
+          const values = parsed.data.map(row => row[header]).filter(v => v);
+          return `Question ${idx + 1}: ${header}\nResponses (${values.length}): ${values.join(', ')}\n`;
+        }).join('\n');
+        
+        setRawCsvText(formatted);
+        console.log('Formatted CSV text loaded:', formatted.length, 'characters');
+      } catch (error) {
+        console.error('Error loading raw CSV text:', error.message);
+        setRawCsvText(null);
+      }
+    };
+    fetchRawCsv();
+  }, [entry]);
+  
   // ============================================
   // STATISTICAL CALCULATION USING DANFOJS
   // ============================================
@@ -448,9 +476,11 @@ function ProcessPage({ entry, program, year, onBack, onLogout, organization }) {
           columns: csvData.columns,
           numericColumns: csvData.columns.filter(col => csvData[col].dtype === 'float32' || csvData[col].dtype === 'int32')
         } : null,
+        csvData: rawCsvText,
         entryName: entry?.name,
         sourceFileName: entry?.sourceFile,
         processId: processId,
+        entryId: entry?._id || entry?.id,
         responseCount: entry?.responseCount,
         programName: program?.name,
         organizationName: organization?.name,

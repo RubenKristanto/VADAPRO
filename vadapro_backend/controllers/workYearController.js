@@ -153,6 +153,7 @@ exports.uploadDatasheets = async (req, res) => {
     
     entry.file = fileMeta;
     entry.sourceFile = file.originalname;
+    
     await workYear.save();
     
     res.status(200).json({ success: true, message: 'File uploaded', files: [fileMeta] });
@@ -194,8 +195,7 @@ exports.deleteWorkYear = async (req, res) => {
     const isAdmin = await Membership.isAdmin(deleter._id, program.organization._id);
     if (!isAdmin) return res.status(403).json({ success: false, message: 'Only admins can delete work years' });
     
-    // Cascade delete: Delete all processes for this work year
-    await Process.deleteMany({ workYear: id });
+    await Process.deleteMany({ entry: { $in: workYear.entries.map(e => e._id) } });
     
     // Clean up GridFS files for this work year
     if (workYear.entries && workYear.entries.length > 0) {

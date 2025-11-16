@@ -27,4 +27,9 @@ const workYearSchema = new mongoose.Schema({
 // unique per program + year
 workYearSchema.index({ program: 1, year: 1 }, { unique: true });
 
+workYearSchema.pre('findOneAndDelete', async function() {
+  const Process = mongoose.model('Process');
+  await Process.deleteMany({ workYear: this.getQuery()._id });
+});
+
 module.exports = mongoose.model('WorkYear', workYearSchema, 'workyears');
