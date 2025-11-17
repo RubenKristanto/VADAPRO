@@ -65,6 +65,7 @@ function DataPage({ program, year, onBack, onLogout, onNavigateToProcess }) {
       name: e.name,
       sourceFile: e.sourceFile || null,
       responseCount: e.responseCount || 0,
+      geminiFileUri: e.geminiFileUri || null,
       persisted: true
     }));
   };

@@ -1,7 +1,8 @@
-const express = require('express');
+import express from 'express';
+import * as aiController from '../controllers/aiController.js';
+import validateInput from '../middleware/validateInput.js';
+
 const router = express.Router();
-const aiController = require('../controllers/aiController');
-const validateInput = require('../middleware/validateInput');
 
 // POST /ai/analyze - Main endpoint for AI data analysis
 router.post('/analyze', aiController.analyzeData);
@@ -12,4 +13,4 @@ router.get('/usage', aiController.getUsageStats);
 // GET /ai/model - Get model name
 router.get('/model', aiController.getModelName);
 
-module.exports = router;
+export default router;

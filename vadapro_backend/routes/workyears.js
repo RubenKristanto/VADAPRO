@@ -1,7 +1,8 @@
-const express = require('express');
+import express from 'express';
+import * as workYearController from '../controllers/workYearController.js';
+import multer from 'multer';
+
 const router = express.Router();
-const workYearController = require('../controllers/workYearController');
-const multer = require('multer');
 
 // Use memory storage for GridFS
 const upload = multer({ storage: multer.memoryStorage() });
@@ -30,7 +31,7 @@ router.get('/files/:fileId', workYearController.downloadFile);
 // Delete work year (admin only)
 router.delete('/:id', workYearController.deleteWorkYear);
 
-// Delete entry
+// Delete an entry
 router.delete('/:id/entries/:entryId', workYearController.deleteEntry);
 
-module.exports = router;
+export default router;

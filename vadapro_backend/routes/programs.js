@@ -1,6 +1,7 @@
-const express = require('express');
+import express from 'express';
+import * as programController from '../controllers/programController.js';
+
 const router = express.Router();
-const programController = require('../controllers/programController');
 
 // Program CRUD routes
 router.post('/create', programController.createProgram);
@@ -9,4 +10,4 @@ router.get('/:id', programController.getProgramById);
 router.put('/:id', programController.editProgram);
 router.delete('/:id', programController.deleteProgram);
 
-module.exports = router;
+export default router;

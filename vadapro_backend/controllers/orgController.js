@@ -1,14 +1,14 @@
-const Organization = require('../models/organizationModel');
-const User = require('../models/userModel');
-const Membership = require('../models/membershipModel');
-const Program = require('../models/programModel');
-const WorkYear = require('../models/workYearModel');
-const Process = require('../models/processModel');
-const mongoose = require('mongoose');
-const { GridFSBucket } = require('mongodb');
+import Organization from '../models/organizationModel.js';
+import User from '../models/userModel.js';
+import Membership from '../models/membershipModel.js';
+import Program from '../models/programModel.js';
+import WorkYear from '../models/workYearModel.js';
+import Process from '../models/processModel.js';
+import mongoose from 'mongoose';
+import { GridFSBucket } from 'mongodb';
 
 // Create a new organization
-exports.createOrganization = async (req, res) => {
+export const createOrganization = async (req, res) => {
     try {
         const { name, creatorUsername, description } = req.body;
 
@@ -91,7 +91,7 @@ exports.createOrganization = async (req, res) => {
 };
 
 // Get all organizations
-exports.getAllOrganizations = async (req, res) => {
+export const getAllOrganizations = async (req, res) => {
     try {
         const organizations = await Organization.find()
             .populate('creator', 'username')
@@ -121,7 +121,7 @@ exports.getAllOrganizations = async (req, res) => {
 };
 
 // Get organizations by user
-exports.getUserOrganizations = async (req, res) => {
+export const getUserOrganizations = async (req, res) => {
     try {
         const { username } = req.params;
 
@@ -174,7 +174,7 @@ exports.getUserOrganizations = async (req, res) => {
 };
 
 // Get single organization by ID
-exports.getOrganizationById = async (req, res) => {
+export const getOrganizationById = async (req, res) => {
     try {
         const { id } = req.params;
 
@@ -219,7 +219,7 @@ exports.getOrganizationById = async (req, res) => {
 };
 
 // Edit organization
-exports.editOrganization = async (req, res) => {
+export const editOrganization = async (req, res) => {
     try {
         const { id } = req.params;
         const { name, description, editorUsername } = req.body;
@@ -309,7 +309,7 @@ exports.editOrganization = async (req, res) => {
 };
 
 // Delete organization
-exports.deleteOrganization = async (req, res) => {
+export const deleteOrganization = async (req, res) => {
     try {
         const { id } = req.params;
         const { deleterUsername } = req.body;

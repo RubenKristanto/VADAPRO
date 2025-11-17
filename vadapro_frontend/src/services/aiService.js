@@ -15,6 +15,7 @@ class AIService {
         context: {
           entryName: context.entryName,
           sourceFileName: context.sourceFileName,
+          geminiFileUri: context.geminiFileUri,
           processId: context.processId,
           responseCount: context.responseCount,
           programName: context.programName,

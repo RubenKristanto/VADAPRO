@@ -1,10 +1,10 @@
-const Membership = require('../models/membershipModel');
-const Organization = require('../models/organizationModel');
-const User = require('../models/userModel');
-const mongoose = require('mongoose');
+import Membership from '../models/membershipModel.js';
+import Organization from '../models/organizationModel.js';
+import User from '../models/userModel.js';
+import mongoose from 'mongoose';
 
 // Invite user to organization
-exports.inviteUser = async (req, res) => {
+export const inviteUser = async (req, res) => {
     try {
         const { organizationId, username, inviterUsername } = req.body;
 
@@ -112,7 +112,7 @@ exports.inviteUser = async (req, res) => {
 };
 
 // Remove user from organization
-exports.removeUser = async (req, res) => {
+export const removeUser = async (req, res) => {
     try {
         const { organizationId, username, removerUsername } = req.body;
 
@@ -217,7 +217,7 @@ exports.removeUser = async (req, res) => {
 };
 
 // Change user role
-exports.changeUserRole = async (req, res) => {
+export const changeUserRole = async (req, res) => {
     try {
         const { organizationId, username, newRole, changerUsername } = req.body;
 
@@ -339,7 +339,7 @@ exports.changeUserRole = async (req, res) => {
 };
 
 // Get organization members with roles
-exports.getOrganizationMembers = async (req, res) => {
+export const getOrganizationMembers = async (req, res) => {
     try {
         const { organizationId } = req.params;
 
@@ -383,7 +383,7 @@ exports.getOrganizationMembers = async (req, res) => {
 };
 
 // Get user's role in organization
-exports.getUserRole = async (req, res) => {
+export const getUserRole = async (req, res) => {
     try {
         const { organizationId, username } = req.params;
 

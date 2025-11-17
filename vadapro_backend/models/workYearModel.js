@@ -1,4 +1,4 @@
-const mongoose = require('mongoose');
+import mongoose from 'mongoose';
 
 const fileMetaSchema = new mongoose.Schema({
   filename: String,
@@ -14,6 +14,7 @@ const entrySchema = new mongoose.Schema({
   sourceFile: { type: String },
   responseCount: { type: Number, default: 0 },
   file: fileMetaSchema,
+  geminiFileUri: { type: String },
   createdAt: { type: Date, default: Date.now }
 }, { _id: true });
 
@@ -32,4 +33,4 @@ workYearSchema.pre('findOneAndDelete', async function() {
   await Process.deleteMany({ workYear: this.getQuery()._id });
 });
 
-module.exports = mongoose.model('WorkYear', workYearSchema, 'workyears');
+export default mongoose.model('WorkYear', workYearSchema, 'workyears');

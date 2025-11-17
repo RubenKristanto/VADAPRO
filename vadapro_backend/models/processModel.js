@@ -1,4 +1,4 @@
-const mongoose = require('mongoose');
+import mongoose from 'mongoose';
 
 // Sub-schema for chat messages
 const chatMessageSchema = new mongoose.Schema({
@@ -241,4 +241,4 @@ processSchema.index({ processStatus: 1 });
 processSchema.index({ createdAt: -1 });
 processSchema.index({ name: 'text', tags: 'text' });
 
-module.exports = mongoose.model('Process', processSchema, 'processes');
+export default mongoose.model('Process', processSchema, 'processes');

@@ -1,13 +1,15 @@
-const { GoogleGenerativeAI } = require('@google/generative-ai');
-const WorkYear = require('../models/workYearModel');
-const mongoose = require('mongoose');
-const { GridFSBucket } = require('mongodb');
+import WorkYear from '../models/workYearModel.js';
+import mongoose from 'mongoose';
+import { GridFSBucket } from 'mongodb';
+import { GoogleGenAI, createUserContent, createPartFromUri } from '@google/genai';
 
-// Initialize Gemini AI with API key from environment
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+// Initialize Gemini AI with API key
+const genAI = new GoogleGenAI({ 
+  apiKey: process.env.GEMINI_API_KEY
+});
 
 // Centralized model configuration
-const MODEL_NAME = 'gemini-2.5-flash-lite';
+const MODEL_NAME = 'gemini-2.5-flash';
 
 // Rate limiting store (in-memory, replace with Redis for production)
 const rateLimitStore = new Map();
@@ -179,16 +181,36 @@ const executeRequest = async ({ query, statistics, chartConfig, csvSummary, csvD
   try {
     const sanitizedStats = sanitizeData(statistics);
     const sanitizedCsv = sanitizeData(csvSummary);
+    const geminiFileUri = context?.geminiFileUri;
     
-    const contextPrompt = buildContextPrompt(query, sanitizedStats, chartConfig, sanitizedCsv, csvData, context);
-    const model = genAI.getGenerativeModel({ model: MODEL_NAME });
+    let result;
+    console.log(`Gemini File URI: ${geminiFileUri}`);
+    // Use Gemini File API if URI is available
+    if (geminiFileUri) {
+      console.log(`📎 Using Gemini File API: ${geminiFileUri}`);
+      // Use SDK helper functions to properly format file reference
+      result = await genAI.models.generateContent({
+        model: MODEL_NAME,
+        contents: createUserContent([
+          createPartFromUri(geminiFileUri, 'text/csv'),
+          buildLightweightPrompt(query, sanitizedStats, context)
+        ])
+      });
+    } else {
+      // Fallback to inline CSV
+      console.log('📄 Using inline CSV (no Gemini File URI)');
+      const contextPrompt = buildContextPrompt(query, sanitizedStats, chartConfig, sanitizedCsv, csvData, context);
+      result = await genAI.models.generateContent({
+        model: MODEL_NAME,
+        contents: [{ role: 'user', parts: [{ text: contextPrompt }] }]
+      });
+    }
     
-    const result = await model.generateContent(contextPrompt);
-    const response = await result.response;
-    const text = response.text();
+    // The SDK returns response directly, not wrapped
+    const text = result.text;
     
     // Extract token usage
-    const usageMetadata = response.usageMetadata || {};
+    const usageMetadata = result.usageMetadata || {};
     const inputTokens = usageMetadata.promptTokenCount || 0;
     const outputTokens = usageMetadata.candidatesTokenCount || 0;
     
@@ -217,7 +239,7 @@ setInterval(() => {
 }, 5000);
 
 // Main analyze endpoint
-exports.analyzeData = async (req, res) => {
+export const analyzeData = async (req, res) => {
   try {
     const { query, statistics, chartConfig, csvSummary, csvData, context } = req.body;
     console.log('Context received (analyzeData):', JSON.stringify(context, null, 2));
@@ -325,6 +347,34 @@ exports.analyzeData = async (req, res) => {
   }
 };
 
+// Build lightweight prompt for Gemini File API (no inline CSV)
+const buildLightweightPrompt = (query, statistics, context) => {
+  const isSimple = query.length < 50 && /what|name|how many|which|when|where/i.test(query);
+  const maxWords = query.length < 30 ? 50 : query.length < 100 ? 150 : 300;
+
+  let prompt = `You are analyzing the CSV file that was uploaded. Answer this question concisely:\n\nQUERY: ${query}\n\n`;
+
+  if (context) {
+    prompt += `CONTEXT:\n`;
+    if (context.sourceFileName) prompt += `- File: ${context.sourceFileName}\n`;
+    if (context.entryName) prompt += `- Process: ${context.entryName}\n`;
+    if (context.responseCount) prompt += `- Responses: ${context.responseCount}\n`;
+    if (context.programName) prompt += `- Program: ${context.programName}\n`;
+    if (context.organizationName) prompt += `- Organization: ${context.organizationName}\n`;
+    if (context.year) prompt += `- Year: ${context.year}\n\n`;
+  }
+
+  if (statistics && Object.keys(statistics).length > 0) {
+    prompt += `STATISTICS:\n${JSON.stringify(statistics, null, 2)}\n\n`;
+  }
+
+  prompt += isSimple 
+    ? `Answer in 1-2 sentences. State only what was asked.\n\nYour response:`
+    : `Provide focused analysis (max ${maxWords} words). Use bullets only for multiple points.\n\nYour response:`;
+
+  return prompt;
+};
+
 // Build comprehensive context prompt for Gemini
 const buildContextPrompt = (query, statistics, chartConfig, csvSummary, csvData, context) => {
   const isSimple = query.length < 50 && /what|name|how many|which|when|where/i.test(query);
@@ -352,9 +402,10 @@ USER QUERY: ${query}
     if (context.year) prompt += `- Year: ${context.year}\n\n`;
   }
 
-  if (csvData) {
+  /*if (csvData) {
     prompt += `SURVEY DATA:\n${csvData}\n`;
-  } else if (csvSummary) {
+  }*/ 
+  if (csvSummary) {
     prompt += `DATA: ${csvSummary.totalRows} rows, ${csvSummary.totalColumns} columns\n`;
     if (csvSummary.columns) prompt += `Columns: ${csvSummary.columns.join(', ')}\n\n`;
   }
@@ -371,7 +422,7 @@ USER QUERY: ${query}
 };
 
 // Get current usage statistics
-exports.getUsageStats = async (req, res) => {
+export const getUsageStats = async (req, res) => {
   try {
     const remainingTokens = RATE_LIMITS.maxTokensPerDay - totalTokensToday;
     const usagePercentage = (totalTokensToday / RATE_LIMITS.maxTokensPerDay) * 100;
@@ -396,4 +447,4 @@ exports.getUsageStats = async (req, res) => {
 };
 
 // Get model name
-exports.getModelName = (req, res) => res.json({ success: true, model: MODEL_NAME });
+export const getModelName = (req, res) => res.json({ success: true, model: MODEL_NAME });

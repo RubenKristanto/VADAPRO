@@ -1,13 +1,26 @@
-const WorkYear = require('../models/workYearModel');
-const Program = require('../models/programModel');
-const User = require('../models/userModel');
-const Membership = require('../models/membershipModel');
-const Process = require('../models/processModel');
-const mongoose = require('mongoose');
-const { GridFSBucket } = require('mongodb');
+import WorkYear from '../models/workYearModel.js';
+import Program from '../models/programModel.js';
+import User from '../models/userModel.js';
+import Membership from '../models/membershipModel.js';
+import Process from '../models/processModel.js';
+import mongoose from 'mongoose';
+import { GridFSBucket } from 'mongodb';
+import fs from 'fs/promises';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
+import { GoogleGenAI } from '@google/genai';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+// Initialize Gemini AI with API key
+const genai = new GoogleGenAI({ 
+  apiKey: process.env.GEMINI_API_KEY
+});
 
 // Create work year
-exports.createWorkYear = async (req, res) => {
+export const createWorkYear = async (req, res) => {
   try {
     const { programId, year } = req.body;
 
@@ -36,7 +49,7 @@ exports.createWorkYear = async (req, res) => {
 };
 
 // Get work years for a program
-exports.getProgramWorkYears = async (req, res) => {
+export const getProgramWorkYears = async (req, res) => {
   try {
     const { programId } = req.params;
     if (!mongoose.Types.ObjectId.isValid(programId)) return res.status(400).json({ success: false, message: 'Invalid programId' });
@@ -50,7 +63,7 @@ exports.getProgramWorkYears = async (req, res) => {
 };
 
 // Get single work year by id
-exports.getWorkYearById = async (req, res) => {
+export const getWorkYearById = async (req, res) => {
   try {
     const { id } = req.params;
     if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ success: false, message: 'Invalid id' });
@@ -66,7 +79,7 @@ exports.getWorkYearById = async (req, res) => {
 };
 
 // Create a data entry for a work year
-exports.createEntry = async (req, res) => {
+export const createEntry = async (req, res) => {
   try {
     const { id } = req.params; // workYear id
     const { name } = req.body;
@@ -91,7 +104,7 @@ exports.createEntry = async (req, res) => {
 };
 
 // Update entry sourceFile
-exports.updateEntry = async (req, res) => {
+export const updateEntry = async (req, res) => {
   try {
     const { id, entryId } = req.params;
     const { sourceFile } = req.body;
@@ -116,7 +129,7 @@ exports.updateEntry = async (req, res) => {
 };
 
 // Upload file to GridFS and attach to entry
-exports.uploadDatasheets = async (req, res) => {
+export const uploadDatasheets = async (req, res) => {
   try {
     const { id, entryId } = req.params;
     if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ success: false, message: 'Invalid workYear id' });
@@ -154,6 +167,29 @@ exports.uploadDatasheets = async (req, res) => {
     entry.file = fileMeta;
     entry.sourceFile = file.originalname;
     
+    // Upload to Gemini File API for AI reference
+    try {
+      const tempPath = path.join(__dirname, '..', 'uploads', 'csv', `temp_${Date.now()}_${file.originalname}`);
+      await fs.writeFile(tempPath, file.buffer);
+      // Upload file using SDK's files.upload method with correct CSV MIME type
+      const uploadResult = await genai.files.upload({
+        file: tempPath,
+        config: {
+          mimeType: 'text/csv',
+          displayName: file.originalname
+        }
+      });
+      const fileName = uploadResult.name;
+      const fetchedFile = await genai.files.get({ name: fileName });
+      console.log(fetchedFile);
+      // Store URI for later reference in AI queries
+      entry.geminiFileUri = uploadResult.uri;
+      await fs.unlink(tempPath);
+      console.log(`✅ Gemini File API upload successful: ${uploadResult.uri}`);
+    } catch (geminiErr) {
+      console.error('⚠️ Gemini File API upload failed:', geminiErr.message);
+    }
+    
     await workYear.save();
     
     res.status(200).json({ success: true, message: 'File uploaded', files: [fileMeta] });
@@ -164,7 +200,7 @@ exports.uploadDatasheets = async (req, res) => {
 };
 
 // Download file from GridFS
-exports.downloadFile = async (req, res) => {
+export const downloadFile = async (req, res) => {
   try {
     const { fileId } = req.params;
     const bucket = new GridFSBucket(mongoose.connection.db, { bucketName: 'upload' });
@@ -182,7 +218,7 @@ exports.downloadFile = async (req, res) => {
   }
 };
 
-exports.deleteWorkYear = async (req, res) => {
+export const deleteWorkYear = async (req, res) => {
   try {
     const { id } = req.params;
     const { deleterUsername } = req.body;
@@ -220,7 +256,7 @@ exports.deleteWorkYear = async (req, res) => {
   }
 };
 
-exports.deleteEntry = async (req, res) => {
+export const deleteEntry = async (req, res) => {
   try {
     const { id, entryId } = req.params;
     if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ success: false, message: 'Invalid workYear id' });

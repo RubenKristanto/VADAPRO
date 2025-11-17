@@ -1,4 +1,4 @@
-const mongoose = require('mongoose');
+import mongoose from 'mongoose';
 
 const organizationSchema = new mongoose.Schema({
     name: { 
@@ -66,4 +66,4 @@ organizationSchema.virtual('programCount').get(function() {
 organizationSchema.set('toJSON', { virtuals: true });
 organizationSchema.set('toObject', { virtuals: true });
 
-module.exports = mongoose.model('Organization', organizationSchema, 'organizations');
+export default mongoose.model('Organization', organizationSchema, 'organizations');

@@ -1,6 +1,7 @@
-const express = require('express');
+import express from 'express';
+import * as processController from '../controllers/processController.js';
+
 const router = express.Router();
-const processController = require('../controllers/processController');
 
 // Process CRUD routes
 router.post('/create', processController.createProcess);
@@ -22,4 +23,4 @@ router.put('/:id/stats/:statId', processController.updateStatValue);
 router.put('/:id/progress', processController.updateProgress);
 router.put('/:id/status', processController.updateProcessStatus);
 
-module.exports = router;
+export default router;

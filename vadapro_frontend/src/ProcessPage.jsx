@@ -462,9 +462,8 @@ function ProcessPage({ entry, program, year, onBack, onLogout, organization }) {
     return getAllStats().find(stat => stat.id === statId);
   };
 
-  // ============================================
-  // GEMINI API INTEGRATION
-  // ============================================
+  
+  // gemini API integration
   const sendMessageToGemini = async (message) => {
     try {
       const context = {
@@ -481,6 +480,7 @@ function ProcessPage({ entry, program, year, onBack, onLogout, organization }) {
         sourceFileName: entry?.sourceFile,
         processId: processId,
         entryId: entry?._id || entry?.id,
+        geminiFileUri: entry?.geminiFileUri,
         responseCount: entry?.responseCount,
         programName: program?.name,
         organizationName: organization?.name,
@@ -515,9 +515,7 @@ function ProcessPage({ entry, program, year, onBack, onLogout, organization }) {
       return '❌ Unable to connect to AI service. Please check your connection and try again.';
     }
   };
-  // ============================================
-  // END OF GEMINI API INTEGRATION
-  // ============================================
+  // end of gemini API integration
 
   // Handle sending a chat message
   const handleSendMessage = async () => {
