@@ -1,14 +1,16 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { authService } from './services/authentication.js';
 import './LoginPage.css';
 
-function LoginPage({ onLoginSuccess }) {
+function LoginPage() {
+  const navigate = useNavigate();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [message, setMessage] = useState(''); // <-- Renamed state for consistency
-  const [errorType, setErrorType] = useState(''); // Track error type for styling
+  const [message, setMessage] = useState('');
+  const [errorType, setErrorType] = useState('');
 
   const handleRegister = async (e) => {
     e.preventDefault();
@@ -45,14 +47,10 @@ function LoginPage({ onLoginSuccess }) {
     try {
       const result = await authService.login({ username, password });
       
-      // If login is successful, call the success callback immediately
       if (result && result.token) {
         console.log(`Logged in - Username: ${result.user.username}, ID: ${result.user.id || result.user._id}`);
-        // Small delay to show success message before transition
         setTimeout(() => {
-          if (onLoginSuccess) {
-            onLoginSuccess(result.user);
-          }
+          navigate('/organizations');
         }, 500);
       }
       

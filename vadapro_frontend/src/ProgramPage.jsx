@@ -1,20 +1,53 @@
 import { useState, useEffect } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import './ProgramPage.css';
 import programService from './services/programService';
 import workYearService from './services/workYearService';
 import { authService } from './services/authentication';
 import { isUserAdmin } from './services/membershipService';
+import organizationService from './services/organizationService';
 
-function ProgramsPage({ organization, onBack, onLogout, onYearSelect }) {
+function ProgramsPage() {
+  const navigate = useNavigate();
+  const { orgId } = useParams();
+  const [organization, setOrganization] = useState(null);
   const [programs, setPrograms] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [newProgramName, setNewProgramName] = useState('');
   const [yearError, setYearError] = useState('');
 
   useEffect(() => {
+    const fetchOrganization = async () => {
+      try {
+        const user = authService.getCurrentUser();
+        const response = await organizationService.getUserOrganizations(user.username);
+        if (response.success) {
+          const org = response.organizations.find(o => o._id === orgId);
+          setOrganization(org);
+        }
+      } catch (error) {
+        console.error('Failed to fetch organization', error);
+      }
+    };
+    if (orgId) fetchOrganization();
+  }, [orgId]);
+
+  useEffect(() => {
     if (organization && organization._id) loadPrograms();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [organization]);
+
+  const handleLogout = () => {
+    authService.logout();
+    navigate('/login');
+  };
+
+  const handleBack = () => {
+    navigate('/organizations');
+  };
+
+  const handleYearClick = (program, yearValue) => {
+    navigate(`/organizations/${orgId}/programs/${program._id}/years/${yearValue}/data`);
+  };
 
   const loadPrograms = async () => {
     if (!organization || !organization._id) return;
@@ -31,8 +64,7 @@ function ProgramsPage({ organization, onBack, onLogout, onYearSelect }) {
             return { ...p, years: [] };
           }
         }));
-  // Normalize: add `id` field (used by existing UI) mapped from Mongo `_id`
-  setPrograms(withYears.map(p => ({ ...p, id: p._id })));
+        setPrograms(withYears.map(p => ({ ...p, id: p._id })));
       }
     } catch (err) {
       console.error('Failed loading programs', err);
@@ -41,18 +73,15 @@ function ProgramsPage({ organization, onBack, onLogout, onYearSelect }) {
     }
   };
   
-  // Deletion confirmation states
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [programToDelete, setProgramToDelete] = useState(null);
   const [deleteConfirmName, setDeleteConfirmName] = useState('');
-  const [confirmationStep, setConfirmationStep] = useState('name'); // 'name' or 'final'
+  const [confirmationStep, setConfirmationStep] = useState('name');
   
-  // Year instance states
   const [showYearModal, setShowYearModal] = useState(false);
   const [currentProgramForYear, setCurrentProgramForYear] = useState(null);
   const [newYear, setNewYear] = useState('');
 
-  // Year deletion states
   const [showDeleteYearModal, setShowDeleteYearModal] = useState(false);
   const [yearToDelete, setYearToDelete] = useState(null);
   const [deleteYearConfirm, setDeleteYearConfirm] = useState('');
@@ -193,14 +222,9 @@ function ProgramsPage({ organization, onBack, onLogout, onYearSelect }) {
         <div className="header-content">
           <h1>VADAPRO <span className="subtitle">Programs - {organization?.name}</span></h1>
           <div className="header-actions">
-            <button onClick={onBack} className="back-btn">
-              ← Back to Organizations
-            </button>
-            {onLogout && (
-              <button onClick={onLogout} className="logout-btn">
-                Logout
-              </button>
-            )}
+            <button onClick={handleBack} className="back-btn">← Back to Organizations</button>
+            <button onClick={handleLogout} className="logout-btn">Logout</button>
+            <span style={{padding:'6px 12px',background:'#000000',borderRadius:'5px',fontSize:'20px'}}>{authService.getCurrentUser()?.username}</span>
           </div>
         </div>
       </header>
@@ -260,10 +284,9 @@ function ProgramsPage({ organization, onBack, onLogout, onYearSelect }) {
                               key={year.id} 
                               className="year-item"
                               onClick={(e) => {
-                                // Only navigate if not clicking delete button
                                 if (!e.target.classList.contains('year-delete-btn')) {
                                   console.log(`Accessing Program - Name: ${program.name}, ID: ${program._id || program.id}, Year: ${year.year}`);
-                                  onYearSelect && onYearSelect(program, year.year);
+                                  handleYearClick(program, year.year);
                                 }
                               }}
                               style={{ cursor: 'pointer' }}

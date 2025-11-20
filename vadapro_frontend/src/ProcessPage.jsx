@@ -1,7 +1,12 @@
 import { useState, useEffect } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import './ProcessPage.css';
 import processService from './services/processService';
 import aiService from './services/aiService';
+import workYearService from './services/workYearService';
+import programService from './services/programService';
+import organizationService from './services/organizationService';
+import { authService } from './services/authentication';
 import * as dfd from 'danfojs';
 import Papa from 'papaparse';
 import DynamicChart from './components/DynamicChart';
@@ -34,21 +39,60 @@ const kurt = (series) => {
   return values.reduce((a, b) => a + Math.pow((b - mean) / std, 4), 0) / n - 3;
 };
 
-function ProcessPage({ entry, program, year, onBack, onLogout, organization }) {
+function ProcessPage() {
+  const navigate = useNavigate();
+  const { orgId, programId, year, entryId } = useParams();
+  const [entry, setEntry] = useState(null);
+  const [program, setProgram] = useState(null);
+  const [organization, setOrganization] = useState(null);
   const [processId, setProcessId] = useState(null);
   const [processStatus, setProcessStatus] = useState('ready');
   const [progress, setProgress] = useState(0);
   const [logs, setLogs] = useState([]);
   const [imageUrl, setImageUrl] = useState(null);
   const [initError, setInitError] = useState(null);
-  const [csvData, setCsvData] = useState(null); // DataFrame from CSV
-  const [rawCsvText, setRawCsvText] = useState(null); // Raw CSV text for AI analysis
+  const [csvData, setCsvData] = useState(null);
+  const [rawCsvText, setRawCsvText] = useState(null);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const user = authService.getCurrentUser();
+        const orgResponse = await organizationService.getUserOrganizations(user.username);
+        if (orgResponse.success) {
+          const org = orgResponse.organizations.find(o => o._id === orgId);
+          setOrganization(org);
+        }
+        const progResponse = await programService.getOrganizationPrograms(orgId);
+        if (progResponse.success) {
+          const prog = progResponse.programs.find(p => p._id === programId);
+          setProgram(prog);
+        }
+        const wyResponse = await workYearService.getProgramWorkYears(programId);
+        if (wyResponse.success) {
+          const wy = wyResponse.workYears.find(w => w.year === parseInt(year, 10));
+          if (wy) {
+            const wyDetail = await workYearService.getWorkYearById(wy._id);
+            if (wyDetail.success) {
+              const foundEntry = wyDetail.workYear.entries.find(e => e._id === entryId);
+              setEntry(foundEntry);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch data', error);
+      }
+    };
+    if (orgId && programId && year && entryId) fetchData();
+  }, [orgId, programId, year, entryId]);
   
-  // Handler to clear current process and go back
+  const handleLogout = () => {
+    authService.logout();
+    navigate('/login');
+  };
+
   const handleBack = () => {
-    // Don't clear the process ID - keep it for when user returns
-    // localStorage.removeItem('currentProcessId');
-    if (onBack) onBack();
+    navigate(`/organizations/${orgId}/programs/${programId}/years/${year}/data`);
   };
   
   // Statistical parameters state
@@ -485,7 +529,7 @@ function ProcessPage({ entry, program, year, onBack, onLogout, organization }) {
         programName: program?.name,
         organizationName: organization?.name,
         year: year,
-        userId: localStorage.getItem('username'),
+        userId: authService.getCurrentUser()?.username,
         queryLength: message.length
       };
 
@@ -705,14 +749,9 @@ function ProcessPage({ entry, program, year, onBack, onLogout, organization }) {
         <div className="header-content">
           <h1>VADAPRO <span className="subtitle">Process{program?.name ? ` - ${program.name}` : ''}{year ? ` (${year})` : ''}</span></h1>
           <div className="header-actions">
-            <button onClick={handleBack} className="back-btn">
-              ← Back to Data
-            </button>
-            {onLogout && (
-              <button onClick={onLogout} className="logout-btn">
-                Logout
-              </button>
-            )}
+            <button onClick={handleBack} className="back-btn">← Back to Data</button>
+            <button onClick={handleLogout} className="logout-btn">Logout</button>
+            <span style={{padding:'6px 12px',background:'#000000',borderRadius:'5px',fontSize:'20px'}}>{authService.getCurrentUser()?.username}</span>
           </div>
         </div>
       </header>

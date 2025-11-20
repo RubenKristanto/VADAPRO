@@ -1,10 +1,14 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import './OrganizationPage.css';
 import organizationService from './services/organizationService';
 import MemberManagement from './components/MemberManagement';
 import { isUserAdmin } from './services/membershipService';
+import { authService } from './services/authentication.js';
 
-function OrganizationsPage({ onLogout, onOrganizationSelect, currentUser }) {
+function OrganizationsPage() {
+  const navigate = useNavigate();
+  const [currentUser, setCurrentUser] = useState(null);
   const [organizations, setOrganizations] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [newOrgName, setNewOrgName] = useState('');
@@ -12,23 +16,34 @@ function OrganizationsPage({ onLogout, onOrganizationSelect, currentUser }) {
   const [success, setSuccess] = useState('');
   const [adminOrgs, setAdminOrgs] = useState(new Set());
   
-  // Deletion confirmation states
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [orgToDelete, setOrgToDelete] = useState(null);
   const [deleteConfirmName, setDeleteConfirmName] = useState('');
-  const [confirmationStep, setConfirmationStep] = useState('name'); // 'name' or 'final'
+  const [confirmationStep, setConfirmationStep] = useState('name');
 
-  // Edit organization states
   const [editingOrg, setEditingOrg] = useState(null);
   const [editOrgName, setEditOrgName] = useState('');
 
-  // Member management states
   const [showMemberModal, setShowMemberModal] = useState(false);
   const [selectedOrg, setSelectedOrg] = useState(null);
 
   useEffect(() => {
-    loadUserOrganizations();
+    const user = authService.getCurrentUser();
+    setCurrentUser(user);
+  }, []);
+
+  useEffect(() => {
+    if (currentUser) loadUserOrganizations();
   }, [currentUser]);
+
+  const handleLogout = () => {
+    authService.logout();
+    navigate('/login');
+  };
+
+  const handleOrganizationClick = (org) => {
+    navigate(`/organizations/${org._id}/programs`);
+  };
 
   const loadUserOrganizations = async () => {
     if (!currentUser?.username) return;
@@ -194,13 +209,6 @@ function OrganizationsPage({ onLogout, onOrganizationSelect, currentUser }) {
     setSelectedOrg(null);
   };
 
-  const handleOrganizationClick = (org) => {
-    console.log(`Accessing Organization - Name: ${org.name}, ID: ${org._id || org.id}`);
-    if (onOrganizationSelect) {
-      onOrganizationSelect(org);
-    }
-  };
-
   const clearMessages = () => {
     setError('');
     setSuccess('');
@@ -220,11 +228,10 @@ function OrganizationsPage({ onLogout, onOrganizationSelect, currentUser }) {
     <div className="organizations-container">
       <header className="organizations-header">
         <h1>VADAPRO <span className="subtitle">Organizations</span></h1>
-        {onLogout && (
-          <button onClick={onLogout} className="logout-btn">
-            Logout
-          </button>
-        )}
+        <div style={{display:'flex',alignItems:'center',gap:'10px'}}>
+          <button onClick={handleLogout} className="logout-btn">Logout</button>
+          <span style={{padding:'6px 12px',background:'#000000',borderRadius:'5px',fontSize:'20px'}}>{currentUser?.username}</span>
+        </div>
       </header>
       
       <div className="organizations-content">
