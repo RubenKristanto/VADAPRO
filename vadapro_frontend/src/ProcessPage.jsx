@@ -1,8 +1,11 @@
 import { useState, useEffect } from 'react';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import './ProcessPage.css';
 import processService from './services/processService';
 import aiService from './services/aiService';
 import { authService } from './services/authentication';
+import workYearService from './services/workYearService';
+import programService from './services/programService';
 import * as dfd from 'danfojs';
 import Papa from 'papaparse';
 import DynamicChart from './components/DynamicChart';
@@ -35,7 +38,13 @@ const kurt = (series) => {
   return values.reduce((a, b) => a + Math.pow((b - mean) / std, 4), 0) / n - 3;
 };
 
-function ProcessPage({ entry, program, year, onBack, onLogout, organization }) {
+function ProcessPage({ onLogout }) {
+  const { organizationId, programId, year, entryId } = useParams();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [entry, setEntry] = useState(location.state?.entry || null);
+  const [program, setProgram] = useState(location.state?.program || null);
+  const [organization, setOrganization] = useState(location.state?.organization || null);
   const currentUser = authService.getCurrentUser();
   const [processId, setProcessId] = useState(null);
   const [processStatus, setProcessStatus] = useState('ready');
@@ -48,9 +57,7 @@ function ProcessPage({ entry, program, year, onBack, onLogout, organization }) {
   
   // Handler to clear current process and go back
   const handleBack = () => {
-    // Don't clear the process ID - keep it for when user returns
-    // localStorage.removeItem('currentProcessId');
-    if (onBack) onBack();
+    navigate(`/organizations/${organizationId}/programs/${programId}/year/${year}/data`);
   };
   
   // Statistical parameters state
@@ -176,9 +183,36 @@ function ProcessPage({ entry, program, year, onBack, onLogout, organization }) {
     }]);
   }, []);
 
-  // ============================================
-  // INITIALIZE PROCESS AND FETCH DATA FROM BACKEND
-  // ============================================
+  useEffect(() => {
+    const loadEntry = async () => {
+      if (!entry && entryId && programId) {
+        try {
+          const resp = await programService.getOrganizationPrograms(organizationId);
+          if (resp.success) {
+            const prog = resp.programs.find(p => p._id === programId);
+            if (prog) {
+              setProgram(prog);
+              const wyResp = await workYearService.getProgramWorkYears(programId);
+              if (wyResp.success) {
+                const wy = wyResp.workYears.find(w => w.year === parseInt(year, 10));
+                if (wy) {
+                  const wyDetail = await workYearService.getWorkYearById(wy._id);
+                  if (wyDetail.success) {
+                    const foundEntry = wyDetail.workYear.entries?.find(e => e._id === entryId);
+                    if (foundEntry) setEntry(foundEntry);
+                  }
+                }
+              }
+            }
+          }
+        } catch (error) {
+          console.error('Failed to load entry', error);
+        }
+      }
+    };
+    loadEntry();
+  }, [entryId, entry, programId, organizationId, year]);
+
   useEffect(() => {
     const initializeProcess = async () => {
       try {

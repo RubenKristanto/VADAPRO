@@ -1,10 +1,17 @@
 import { useState, useEffect, useRef } from 'react';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import './DataPage.css';
 import workYearService from './services/workYearService';
 import { authService } from './services/authentication';
+import programService from './services/programService';
 import * as dfd from 'danfojs';
 
-function DataPage({ program, year, onBack, onLogout, onNavigateToProcess }) {
+function DataPage({ onLogout }) {
+  const { organizationId, programId, year } = useParams();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [program, setProgram] = useState(location.state?.program || null);
+  const [organization, setOrganization] = useState(location.state?.organization || null);
   const currentUser = authService.getCurrentUser();
   const [entries, setEntries] = useState([]);
   const [expandedEntries, setExpandedEntries] = useState(new Set());
@@ -27,6 +34,23 @@ function DataPage({ program, year, onBack, onLogout, onNavigateToProcess }) {
     setShowAddModal(true);
     setNewEntryName('');
   };
+
+  useEffect(() => {
+    const loadProgram = async () => {
+      if (!program && programId) {
+        try {
+          const resp = await programService.getOrganizationPrograms(organizationId);
+          if (resp.success) {
+            const prog = resp.programs.find(p => p._id === programId);
+            if (prog) setProgram(prog);
+          }
+        } catch (error) {
+          console.error('Failed to load program', error);
+        }
+      }
+    };
+    loadProgram();
+  }, [programId, program, organizationId]);
 
   useEffect(() => {
     const loadWorkYear = async () => {
@@ -52,7 +76,7 @@ function DataPage({ program, year, onBack, onLogout, onNavigateToProcess }) {
       }
     };
     loadWorkYear();
-  }, [program, year]);
+  }, [program, year, programId]);
 
   const closeAddModal = () => {
     setShowAddModal(false);
@@ -217,9 +241,9 @@ function DataPage({ program, year, onBack, onLogout, onNavigateToProcess }) {
   };
 
   const startProcess = () => {
-    if (onNavigateToProcess) {
-      onNavigateToProcess(entryToProcess);
-    }
+    navigate(`/organizations/${organizationId}/programs/${programId}/year/${year}/data/${entryToProcess.id}/process`, {
+      state: { entry: entryToProcess, program, year, organization }
+    });
     closeProcessModal();
   };
 
@@ -229,7 +253,7 @@ function DataPage({ program, year, onBack, onLogout, onNavigateToProcess }) {
         <div className="header-content">
           <h1>VADAPRO <span className="subtitle">Data - {program?.name} ({year})</span></h1>
           <div className="header-actions">
-            <button onClick={onBack} className="back-btn">
+            <button onClick={() => navigate(`/organizations/${organizationId}/programs`)} className="back-btn">
               ← Back to Programs
             </button>
             {onLogout && (

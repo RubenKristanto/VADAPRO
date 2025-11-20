@@ -1,19 +1,41 @@
 import { useState, useEffect } from 'react';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import './ProgramPage.css';
 import programService from './services/programService';
 import workYearService from './services/workYearService';
 import { authService } from './services/authentication';
 import { isUserAdmin } from './services/membershipService';
+import organizationService from './services/organizationService';
 
-function ProgramsPage({ organization, onBack, onLogout, onYearSelect, currentUser }) {
+function ProgramsPage({ onLogout, currentUser }) {
+  const { organizationId } = useParams();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [organization, setOrganization] = useState(location.state?.organization || null);
   const [programs, setPrograms] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [newProgramName, setNewProgramName] = useState('');
   const [yearError, setYearError] = useState('');
 
   useEffect(() => {
+    const loadOrganization = async () => {
+      if (!organization && organizationId) {
+        try {
+          const response = await organizationService.getUserOrganizations(currentUser?.username);
+          if (response.success) {
+            const org = response.organizations.find(o => o._id === organizationId);
+            if (org) setOrganization(org);
+          }
+        } catch (error) {
+          console.error('Failed to load organization', error);
+        }
+      }
+    };
+    loadOrganization();
+  }, [organizationId, organization, currentUser]);
+
+  useEffect(() => {
     if (organization && organization._id) loadPrograms();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [organization]);
 
   const loadPrograms = async () => {
@@ -193,7 +215,7 @@ function ProgramsPage({ organization, onBack, onLogout, onYearSelect, currentUse
         <div className="header-content">
           <h1>VADAPRO <span className="subtitle">Programs - {organization?.name}</span></h1>
           <div className="header-actions">
-            <button onClick={onBack} className="back-btn">
+            <button onClick={() => navigate('/organizations')} className="back-btn">
               ← Back to Organizations
             </button>
             {onLogout && (
@@ -261,10 +283,11 @@ function ProgramsPage({ organization, onBack, onLogout, onYearSelect, currentUse
                               key={year.id} 
                               className="year-item"
                               onClick={(e) => {
-                                // Only navigate if not clicking delete button
                                 if (!e.target.classList.contains('year-delete-btn')) {
                                   console.log(`Accessing Program - Name: ${program.name}, ID: ${program._id || program.id}, Year: ${year.year}`);
-                                  onYearSelect && onYearSelect(program, year.year);
+                                  navigate(`/organizations/${organizationId}/programs/${program._id}/year/${year.year}/data`, {
+                                    state: { program, year: year.year, organization }
+                                  });
                                 }
                               }}
                               style={{ cursor: 'pointer' }}
