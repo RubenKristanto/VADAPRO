@@ -23,8 +23,8 @@ export const authService = {
         const token = response.data.token || 'demo-token';
         const user = response.data.user || { username: credentials.username };
         
-        localStorage.setItem('authToken', token);
-        localStorage.setItem('user', JSON.stringify(user));
+        sessionStorage.setItem('authToken', token);
+        sessionStorage.setItem('user', JSON.stringify(user));
         
         return { token, user, message: response.data.message };
       } else {
@@ -58,18 +58,16 @@ export const authService = {
 
   // Logout function
   logout() {
-    localStorage.removeItem('authToken');
-    localStorage.removeItem('user');
+    sessionStorage.removeItem('authToken');
+    sessionStorage.removeItem('user');
   },
 
-  // Check if user is authenticated
   isAuthenticated() {
-    return !!localStorage.getItem('authToken');
+    return !!sessionStorage.getItem('authToken');
   },
 
-  // Get current user
   getCurrentUser() {
-    const user = localStorage.getItem('user');
+    const user = sessionStorage.getItem('user');
     return user ? JSON.parse(user) : null;
   },
 };

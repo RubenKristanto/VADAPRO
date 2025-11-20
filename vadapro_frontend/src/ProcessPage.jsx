@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import './ProcessPage.css';
 import processService from './services/processService';
 import aiService from './services/aiService';
+import { authService } from './services/authentication';
 import * as dfd from 'danfojs';
 import Papa from 'papaparse';
 import DynamicChart from './components/DynamicChart';
@@ -35,6 +36,7 @@ const kurt = (series) => {
 };
 
 function ProcessPage({ entry, program, year, onBack, onLogout, organization }) {
+  const currentUser = authService.getCurrentUser();
   const [processId, setProcessId] = useState(null);
   const [processStatus, setProcessStatus] = useState('ready');
   const [progress, setProgress] = useState(0);
@@ -709,9 +711,10 @@ function ProcessPage({ entry, program, year, onBack, onLogout, organization }) {
               ← Back to Data
             </button>
             {onLogout && (
-              <button onClick={onLogout} className="logout-btn">
-                Logout
-              </button>
+              <div style={{display:'flex',alignItems:'center',gap:'10px'}}>
+                <button onClick={onLogout} className="logout-btn">Logout</button>
+                <span style={{fontSize:'20px',color:'#f0f0f0'}}>{currentUser?.username}</span>
+              </div>
             )}
           </div>
         </div>

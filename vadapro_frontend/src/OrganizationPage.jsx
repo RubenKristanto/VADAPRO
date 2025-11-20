@@ -221,9 +221,10 @@ function OrganizationsPage({ onLogout, onOrganizationSelect, currentUser }) {
       <header className="organizations-header">
         <h1>VADAPRO <span className="subtitle">Organizations</span></h1>
         {onLogout && (
-          <button onClick={onLogout} className="logout-btn">
-            Logout
-          </button>
+          <div style={{display:'flex',alignItems:'center',gap:'10px'}}>
+            <button onClick={onLogout} className="logout-btn">Logout</button>
+            <span style={{fontSize:'20px',color:'#f0f0f0'}}>{currentUser?.username}</span>
+          </div>
         )}
       </header>
       

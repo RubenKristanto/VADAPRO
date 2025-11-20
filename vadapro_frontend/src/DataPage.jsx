@@ -1,9 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import './DataPage.css';
 import workYearService from './services/workYearService';
+import { authService } from './services/authentication';
 import * as dfd from 'danfojs';
 
 function DataPage({ program, year, onBack, onLogout, onNavigateToProcess }) {
+  const currentUser = authService.getCurrentUser();
   const [entries, setEntries] = useState([]);
   const [expandedEntries, setExpandedEntries] = useState(new Set());
   const [showAddModal, setShowAddModal] = useState(false);
@@ -231,9 +233,10 @@ function DataPage({ program, year, onBack, onLogout, onNavigateToProcess }) {
               ← Back to Programs
             </button>
             {onLogout && (
-              <button onClick={onLogout} className="logout-btn">
-                Logout
-              </button>
+              <div style={{display:'flex',alignItems:'center',gap:'10px'}}>
+                <button onClick={onLogout} className="logout-btn">Logout</button>
+                <span style={{fontSize:'20px',color:'#f0f0f0'}}>{currentUser?.username}</span>
+              </div>
             )}
           </div>
         </div>

@@ -5,7 +5,7 @@ import workYearService from './services/workYearService';
 import { authService } from './services/authentication';
 import { isUserAdmin } from './services/membershipService';
 
-function ProgramsPage({ organization, onBack, onLogout, onYearSelect }) {
+function ProgramsPage({ organization, onBack, onLogout, onYearSelect, currentUser }) {
   const [programs, setPrograms] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [newProgramName, setNewProgramName] = useState('');
@@ -197,9 +197,10 @@ function ProgramsPage({ organization, onBack, onLogout, onYearSelect }) {
               ← Back to Organizations
             </button>
             {onLogout && (
-              <button onClick={onLogout} className="logout-btn">
-                Logout
-              </button>
+              <div style={{display:'flex',alignItems:'center',gap:'10px'}}>
+                <button onClick={onLogout} className="logout-btn">Logout</button>
+                <span style={{fontSize:'20px',color:'#f0f0f0'}}>{currentUser?.username}</span>
+              </div>
             )}
           </div>
         </div>
