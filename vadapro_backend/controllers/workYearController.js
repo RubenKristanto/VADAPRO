@@ -156,6 +156,7 @@ export const uploadDatasheets = async (req, res) => {
       uploadStream.on('error', reject);
     });
 
+    // create metadata for csv file so frontend can display summary of the file
     const fileMeta = {
       filename: uploadStream.id.toString(),
       originalName: file.originalname,
@@ -163,7 +164,6 @@ export const uploadDatasheets = async (req, res) => {
       size: file.size,
       url: `/api/workyears/files/${uploadStream.id}`
     };
-    
     entry.file = fileMeta;
     entry.sourceFile = file.originalname;
     
@@ -171,7 +171,8 @@ export const uploadDatasheets = async (req, res) => {
     try {
       const tempPath = path.join(__dirname, '..', 'uploads', 'csv', `temp_${Date.now()}_${file.originalname}`);
       await fs.writeFile(tempPath, file.buffer);
-      // Upload file using SDK's files.upload method with correct CSV MIME type
+
+      // upload file using built-in gemini file API upload function
       const uploadResult = await genai.files.upload({
         file: tempPath,
         config: {
@@ -180,11 +181,14 @@ export const uploadDatasheets = async (req, res) => {
         }
       });
       const fileName = uploadResult.name;
+
+      // test if file successfully uploaded and can be retrieved back
       const fetchedFile = await genai.files.get({ name: fileName });
       console.log(fetchedFile);
+
       // Store URI for later reference in AI queries
       entry.geminiFileUri = uploadResult.uri;
-      await fs.unlink(tempPath);
+      await fs.unlink(tempPath);  // clean up temp patht
       console.log(`✅ Gemini File API upload successful: ${uploadResult.uri}`);
     } catch (geminiErr) {
       console.error('⚠️ Gemini File API upload failed:', geminiErr.message);
