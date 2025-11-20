@@ -1,64 +1,25 @@
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
 import './DataPage.css';
 import workYearService from './services/workYearService';
-import programService from './services/programService';
-import organizationService from './services/organizationService';
-import { authService } from './services/authentication';
 import * as dfd from 'danfojs';
 
-function DataPage() {
-  const navigate = useNavigate();
-  const { orgId, programId, year } = useParams();
-  const [program, setProgram] = useState(null);
-  const [organization, setOrganization] = useState(null);
+function DataPage({ program, year, onBack, onLogout, onNavigateToProcess }) {
   const [entries, setEntries] = useState([]);
   const [expandedEntries, setExpandedEntries] = useState(new Set());
   const [showAddModal, setShowAddModal] = useState(false);
   const [newEntryName, setNewEntryName] = useState('');
   const [workYearData, setWorkYearData] = useState(null);
+  // file inputs removed - uploads are handled per-entry via the entry upload button
   
+  // Delete confirmation states
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [entryToDelete, setEntryToDelete] = useState(null);
   const [deleteConfirmName, setDeleteConfirmName] = useState('');
   const [confirmationStep, setConfirmationStep] = useState('name');
   
+  // Process confirmation states
   const [showProcessModal, setShowProcessModal] = useState(false);
   const [entryToProcess, setEntryToProcess] = useState(null);
-
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const user = authService.getCurrentUser();
-        const orgResponse = await organizationService.getUserOrganizations(user.username);
-        if (orgResponse.success) {
-          const org = orgResponse.organizations.find(o => o._id === orgId);
-          setOrganization(org);
-        }
-        const progResponse = await programService.getOrganizationPrograms(orgId);
-        if (progResponse.success) {
-          const prog = progResponse.programs.find(p => p._id === programId);
-          setProgram(prog);
-        }
-      } catch (error) {
-        console.error('Failed to fetch data', error);
-      }
-    };
-    if (orgId && programId) fetchData();
-  }, [orgId, programId]);
-
-  const handleLogout = () => {
-    authService.logout();
-    navigate('/login');
-  };
-
-  const handleBack = () => {
-    navigate(`/organizations/${orgId}/programs`);
-  };
-
-  const handleProcessNavigate = (entry) => {
-    navigate(`/organizations/${orgId}/programs/${programId}/years/${year}/entries/${entry.id}/process`);
-  };
 
   const openAddModal = () => {
     setShowAddModal(true);
@@ -254,7 +215,9 @@ function DataPage() {
   };
 
   const startProcess = () => {
-    handleProcessNavigate(entryToProcess);
+    if (onNavigateToProcess) {
+      onNavigateToProcess(entryToProcess);
+    }
     closeProcessModal();
   };
 
@@ -264,9 +227,14 @@ function DataPage() {
         <div className="header-content">
           <h1>VADAPRO <span className="subtitle">Data - {program?.name} ({year})</span></h1>
           <div className="header-actions">
-            <button onClick={handleBack} className="back-btn">← Back to Programs</button>
-            <button onClick={handleLogout} className="logout-btn">Logout</button>
-            <span style={{padding:'6px 12px',background:'#000000',borderRadius:'5px',fontSize:'20px'}}>{authService.getCurrentUser()?.username}</span>
+            <button onClick={onBack} className="back-btn">
+              ← Back to Programs
+            </button>
+            {onLogout && (
+              <button onClick={onLogout} className="logout-btn">
+                Logout
+              </button>
+            )}
           </div>
         </div>
       </header>
