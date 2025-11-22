@@ -8,7 +8,7 @@ import workYearService from './services/workYearService';
 import programService from './services/programService';
 import * as dfd from 'danfojs';
 import Papa from 'papaparse';
-import DynamicChart from './components/DynamicChart';
+import ChartGenerator from './components/ChartGenerator';
 
 // Backend interface: GET /file/gridfs/:entryId returns CSV file from MongoDB GridFS
 
@@ -779,18 +779,9 @@ function ProcessPage({ onLogout }) {
                     alt="Process visualization" 
                     className="process-image"
                   />
-                ) : processId ? (
-                  // Render DynamicChart when a process exists. The component will fetch CSV via processService.getCsvData(processId).
-                  <div style={{ width: '100%', height: '100%' }}>
-                      <DynamicChart processId={processId} entryId={entry?._id || entry?.id} style={{ width: '100%', height: '100%' }} />
-                  </div>
                 ) : (
-                  <div className="placeholder-content">
-                    <div className="placeholder-icon">🖼️</div>
-                    <p className="placeholder-text">Image Placeholder</p>
-                    <p className="placeholder-subtext">
-                      Image will be loaded from backend
-                    </p>
+                  <div style={{ width: '100%', height: '100%' }}>
+                    <ChartGenerator entryId={entry?._id || entry?.id} />
                   </div>
                 )}
               </div>
