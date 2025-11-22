@@ -62,44 +62,43 @@ const ChartGenerator = ({ entryId }) => {
 
   // Render charts
   useEffect(() => {
-    charts.forEach((chart, idx) => {
-      if (!chartRefs.current[idx]) return;
-      
-      const chartInstance = echarts.init(chartRefs.current[idx]);
-      const labels = Object.keys(chart.data);
-      const values = Object.values(chart.data);
-      
-      let option;
-      if (chart.chartType === 'pie') {
-        option = {
-          tooltip: { trigger: 'item' },
-          legend: { type: 'scroll', bottom: 0 },
-          toolbox: { feature: { saveAsImage: { title: 'Download' } }, right: 10, top: 10 },
-          series: [{ type: 'pie', radius: '50%', data: labels.map((l, i) => ({ name: l, value: values[i] })) }]
-        };
-      } else {
-        option = {
-          tooltip: { trigger: 'axis' },
-          legend: { type: 'scroll', bottom: 0 },
-          toolbox: { feature: { saveAsImage: { title: 'Download' } }, right: 10, top: 10 },
-          grid: { left: 60, right: 40, top: 60, bottom: 80, containLabel: true },
-          xAxis: { type: 'category', data: labels, axisLabel: { rotate: 45, interval: 0 } },
-          yAxis: { type: 'value' },
-          series: [{ type: chart.chartType, data: values, name: chart.question }]
-        };
-      }
-      
-      chartInstance.setOption(option, true);
-      
-      const handleResize = () => chartInstance.resize();
-      window.addEventListener('resize', handleResize);
-      
-      return () => {
-        window.removeEventListener('resize', handleResize);
-        chartInstance.dispose();
+    const chart = charts[currentChartIndex];
+    if (!chart || !chartRefs.current[currentChartIndex]) return;
+    
+    const chartInstance = echarts.init(chartRefs.current[currentChartIndex]);
+    const labels = Object.keys(chart.data);
+    const values = Object.values(chart.data);
+    
+    let option;
+    if (chart.chartType === 'pie') {
+      option = {
+        tooltip: { trigger: 'item' },
+        legend: { type: 'scroll', bottom: 0 },
+        toolbox: { feature: { saveAsImage: { title: 'Download' } }, right: 10, top: 10 },
+        series: [{ type: 'pie', radius: '50%', data: labels.map((l, i) => ({ name: l, value: values[i] })) }]
       };
-    });
-  }, [charts]);
+    } else {
+      option = {
+        tooltip: { trigger: 'axis' },
+        legend: { type: 'scroll', bottom: 0 },
+        toolbox: { feature: { saveAsImage: { title: 'Download' } }, right: 10, top: 10 },
+        grid: { left: 60, right: 40, top: 60, bottom: 80, containLabel: true },
+        xAxis: { type: 'category', data: labels, axisLabel: { rotate: 45, interval: 0 } },
+        yAxis: { type: 'value' },
+        series: [{ type: chart.chartType, data: values, name: chart.question }]
+      };
+    }
+    
+    chartInstance.setOption(option, true);
+    
+    const handleResize = () => chartInstance.resize();
+    window.addEventListener('resize', handleResize);
+    
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      chartInstance.dispose();
+    };
+  }, [charts, currentChartIndex]);
 
   const deleteChart = (idx) => {
     setCharts(prev => prev.filter((_, i) => i !== idx));
@@ -114,7 +113,7 @@ const ChartGenerator = ({ entryId }) => {
   };
 
   return (
-    <div style={{ width: '100%', height: '100%', position: 'relative' }}>
+    <div style={{ width: '80%', height: '100%', position: 'relative' }}>
       {charts.length === 0 ? (
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 20 }}>
           <div style={{ fontSize: 80 }}>📊</div>
@@ -129,28 +128,24 @@ const ChartGenerator = ({ entryId }) => {
             + Generate Chart
           </button>
           
-          <div ref={el => chartRefs.current[currentChartIndex] = el} style={{ width: '100%', height: '100%' }} />
-          
-          {charts.length > 1 && (
-            <div style={{ position: 'absolute', bottom: 20, left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: 10, alignItems: 'center', background: 'rgba(255,255,255,0.9)', padding: 10, borderRadius: 8, boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}>
-              <button onClick={() => navigateChart('left')} disabled={currentChartIndex === 0} style={{ padding: '8px 12px', background: currentChartIndex === 0 ? '#ddd' : '#2196F3', color: 'white', border: 'none', borderRadius: 6, cursor: currentChartIndex === 0 ? 'not-allowed' : 'pointer' }}>
-                ◀
-              </button>
-              <span style={{ fontSize: 14, fontWeight: 'bold' }}>{currentChartIndex + 1} / {charts.length}</span>
-              <button onClick={() => navigateChart('right')} disabled={currentChartIndex === charts.length - 1} style={{ padding: '8px 12px', background: currentChartIndex === charts.length - 1 ? '#ddd' : '#2196F3', color: 'white', border: 'none', borderRadius: 6, cursor: currentChartIndex === charts.length - 1 ? 'not-allowed' : 'pointer' }}>
-                ▶
-              </button>
-              <button onClick={() => deleteChart(currentChartIndex)} style={{ padding: '8px 12px', background: '#f44336', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', marginLeft: 10 }}>
-                ✕
-              </button>
-            </div>
-          )}
-          
-          {charts.length === 1 && (
-            <button onClick={() => deleteChart(0)} style={{ position: 'absolute', top: 10, right: 10, padding: '8px 12px', background: '#f44336', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', zIndex: 10 }}>
+          <div style={{ position: 'absolute', top: 10, left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: 10, alignItems: 'center', background: 'rgba(255,255,255,0.9)', padding: 10, borderRadius: 8, boxShadow: '0 2px 8px rgba(0,0,0,0.15)', zIndex: 10 }}>
+            {charts.length > 1 && (
+              <>
+                <button onClick={() => navigateChart('left')} disabled={currentChartIndex === 0} style={{ padding: '8px 12px', background: currentChartIndex === 0 ? '#ddd' : '#2196F3', color: 'white', border: 'none', borderRadius: 6, cursor: currentChartIndex === 0 ? 'not-allowed' : 'pointer' }}>
+                  ◀
+                </button>
+                <span style={{ fontSize: 14, fontWeight: 'bold' }}>{currentChartIndex + 1} / {charts.length}</span>
+                <button onClick={() => navigateChart('right')} disabled={currentChartIndex === charts.length - 1} style={{ padding: '8px 12px', background: currentChartIndex === charts.length - 1 ? '#ddd' : '#2196F3', color: 'white', border: 'none', borderRadius: 6, cursor: currentChartIndex === charts.length - 1 ? 'not-allowed' : 'pointer' }}>
+                  ▶
+                </button>
+              </>
+            )}
+            <button onClick={() => deleteChart(currentChartIndex)} style={{ padding: '8px 12px', background: '#f44336', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', marginLeft: charts.length > 1 ? 10 : 0 }}>
               ✕
             </button>
-          )}
+          </div>
+          
+          <div ref={el => chartRefs.current[currentChartIndex] = el} style={{ width: '100%', height: '50vh', marginTop: '60px' }} />
         </>
       )}
 

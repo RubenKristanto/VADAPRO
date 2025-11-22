@@ -780,9 +780,7 @@ function ProcessPage({ onLogout }) {
                     className="process-image"
                   />
                 ) : (
-                  <div style={{ width: '100%', height: '100%' }}>
                     <ChartGenerator entryId={entry?._id || entry?.id} />
-                  </div>
                 )}
               </div>
             </div>
