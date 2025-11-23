@@ -94,9 +94,9 @@ class WorkYearService {
     }
   }
 
-  async validateGeminiUri(geminiFileUri) {
+  async validateGeminiUri(workYearId, entryId) {
     try {
-      const response = await axiosAPI.post('/workyears/validate-gemini', { geminiFileUri });
+      const response = await axiosAPI.get(`/workyears/${workYearId}/entries/${entryId}/validate-gemini`);
       return response.data;
     } catch (error) {
       return { success: false, valid: false };

@@ -354,3 +354,40 @@ export const reuploadToGemini = async (req, res) => {
     res.status(500).json({ success: false, message: 'Internal server error', error: err.message });
   }
 };
+
+export const validateGeminiUri = async (req, res) => {
+  try {
+    const { id, entryId } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ success: false, message: 'Invalid workYear id' });
+    if (!mongoose.Types.ObjectId.isValid(entryId)) return res.status(400).json({ success: false, message: 'Invalid entry id' });
+
+    const workYear = await WorkYear.findById(id);
+    if (!workYear) return res.status(404).json({ success: false, message: 'Work year not found' });
+    
+    const entry = workYear.entries.id(entryId);
+    if (!entry) return res.status(404).json({ success: false, message: 'Entry not found' });
+    if (!entry.geminiFileUri) return res.status(200).json({ success: true, valid: false, message: 'No Gemini URI found' });
+
+    try {
+      const fileNameMatch = entry.geminiFileUri.match(/files\/([^\/]+)/);
+      if (!fileNameMatch || !fileNameMatch[1]) {
+        return res.status(200).json({ success: true, valid: false, message: 'Invalid URI format' });
+      }
+
+      const existingFile = await genai.files.get({ name: fileNameMatch[1] });
+      if (existingFile && existingFile.state === 'ACTIVE') {
+        console.log(`✅ Gemini File API valid: ${entry.geminiFileUri}`);
+        return res.status(200).json({ success: true, valid: true, message: 'Gemini file is valid' });
+      } else {
+        console.log(`⚠️ Gemini File API not active: ${entry.geminiFileUri}`);
+        return res.status(200).json({ success: true, valid: false, message: 'Gemini file not active' });
+      }
+    } catch (checkErr) {
+      console.log(`⚠️ Gemini File API validation failed: ${checkErr.message}`);
+      return res.status(200).json({ success: true, valid: false, message: 'Gemini file check failed' });
+    }
+  } catch (err) {
+    console.error('validateGeminiUri error', err);
+    res.status(500).json({ success: false, message: 'Internal server error', error: err.message });
+  }
+};

@@ -276,9 +276,9 @@ function DataPage({ onLogout }) {
       if (entryToProcess.geminiFileUri && workYearData && workYearData._id) {
         setIsUploading(true);
         try {
-          const checkResp = await fetch(`https://generativelanguage.googleapis.com/v1beta/${entryToProcess.geminiFileUri.split('https://generativelanguage.googleapis.com/v1beta/')[1]}?key=${import.meta.env.VITE_GEMINI_API_KEY}`);
+          const validationResp = await workYearService.validateGeminiUri(workYearData._id, entryId);
           
-          if (!checkResp.ok) {
+          if (!validationResp.valid) {
             const reuploadResp = await workYearService.reuploadToGemini(workYearData._id, entryId);
             if (reuploadResp && reuploadResp.success) {
               const single = await workYearService.getWorkYearById(workYearData._id);

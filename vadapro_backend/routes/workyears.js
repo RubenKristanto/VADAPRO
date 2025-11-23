@@ -21,6 +21,8 @@ router.post('/:id/entries/:entryId/datasheets', upload.array('datasheets', 1), w
 
 router.post('/:id/entries/:entryId/reupload-gemini', workYearController.reuploadToGemini);
 
+router.get('/:id/entries/:entryId/validate-gemini', workYearController.validateGeminiUri);
+
 router.post('/:id/entries', workYearController.createEntry);
 
 // Update an entry
