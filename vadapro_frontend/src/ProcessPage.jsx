@@ -9,6 +9,7 @@ import programService from './services/programService';
 import * as dfd from 'danfojs';
 import Papa from 'papaparse';
 import ChartGenerator from './components/ChartGenerator';
+import ComparisonChart from './components/ComparisonChart';
 
 // Backend interface: GET /file/gridfs/:entryId returns CSV file from MongoDB GridFS
 
@@ -72,6 +73,18 @@ function ProcessPage({ onLogout }) {
   const [userInput, setUserInput] = useState('');
   const [isAiTyping, setIsAiTyping] = useState(false);
   const [modelName, setModelName] = useState('AI');
+  
+  // Comparison state
+  const [comparisons, setComparisons] = useState([]);
+  const [currentComparisonIndex, setCurrentComparisonIndex] = useState(0);
+  const [showComparisonModal, setShowComparisonModal] = useState(false);
+  const [availableWorkYears, setAvailableWorkYears] = useState([]);
+  const [selectedCurrentQuestion, setSelectedCurrentQuestion] = useState('');
+  const [selectedTargetYear, setSelectedTargetYear] = useState('');
+  const [selectedTargetEntry, setSelectedTargetEntry] = useState('');
+  const [selectedTargetQuestion, setSelectedTargetQuestion] = useState('');
+  const [targetEntries, setTargetEntries] = useState([]);
+  const [targetQuestions, setTargetQuestions] = useState([]);
   
   // Comprehensive list of statistical parameters available in danfo.js
   // Organized by category for better UX
@@ -715,6 +728,142 @@ function ProcessPage({ onLogout }) {
     }, 800);
   };
 
+  // Comparison feature functions
+  const checkHasMean = (process) => {
+    return process?.selectedStats?.some(stat => stat.statId === 'mean') || false;
+  };
+
+  const getNumericQuestions = () => {
+    if (!csvData) return [];
+    return csvData.columns.filter(col => 
+      csvData[col].dtype === 'float32' || csvData[col].dtype === 'int32'
+    );
+  };
+
+  const openComparisonModal = async () => {
+    try {
+      const wyResponse = await workYearService.getProgramWorkYears(programId);
+      if (wyResponse.success) {
+        const filteredWY = wyResponse.workYears.filter(wy => wy.year !== year);
+        setAvailableWorkYears(filteredWY);
+        setShowComparisonModal(true);
+      }
+    } catch (error) {
+      console.error('Error loading work years:', error);
+    }
+  };
+
+  const handleTargetYearChange = async (selectedYear) => {
+    setSelectedTargetYear(selectedYear);
+    setSelectedTargetEntry('');
+    setSelectedTargetQuestion('');
+    setTargetEntries([]);
+    setTargetQuestions([]);
+    
+    const wy = availableWorkYears.find(w => w.year === selectedYear);
+    if (!wy) return;
+    
+    try {
+      const wyDetail = await workYearService.getWorkYearById(wy._id);
+      if (wyDetail.success && wyDetail.workYear.entries) {
+        const entriesWithMean = [];
+        for (const ent of wyDetail.workYear.entries) {
+          try {
+            const entryProcesses = await processService.getAllProcesses();
+            const matchingProcess = entryProcesses.processes?.find(p => p.entry === ent._id);
+            if (matchingProcess && checkHasMean(matchingProcess)) {
+              entriesWithMean.push(ent);
+            }
+          } catch (err) {
+            console.error('Error checking entry process:', err);
+          }
+        }
+        setTargetEntries(entriesWithMean);
+      }
+    } catch (error) {
+      console.error('Error loading target entries:', error);
+    }
+  };
+
+  const handleTargetEntryChange = async (entryId) => {
+    setSelectedTargetEntry(entryId);
+    setSelectedTargetQuestion('');
+    
+    try {
+      const csvUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/file/gridfs/${entryId}`;
+      const df = await dfd.readCSV(csvUrl);
+      const numCols = df.columns.filter(col => df[col].dtype === 'float32' || df[col].dtype === 'int32');
+      setTargetQuestions(numCols);
+    } catch (error) {
+      console.error('Error loading target questions:', error);
+    }
+  };
+
+  const handleAddComparison = async () => {
+    if (!selectedCurrentQuestion || !selectedTargetYear || !selectedTargetEntry || !selectedTargetQuestion) return;
+    
+    try {
+      const currentMean = statisticsData[`${selectedCurrentQuestion}|mean`] || statisticsData['mean'];
+      
+      const targetProcesses = await processService.getAllProcesses();
+      const targetProcess = targetProcesses.processes?.find(p => p.entry === selectedTargetEntry);
+      
+      if (!targetProcess || !checkHasMean(targetProcess)) {
+        alert('Target entry does not have mean calculated');
+        return;
+      }
+      
+      const targetStat = targetProcess.selectedStats.find(s => s.statId === 'mean');
+      const targetMeanKey = `${selectedTargetQuestion}|mean`;
+      const targetMean = targetStat?.calculatedValues?.[selectedTargetQuestion] || 
+                         targetStat?.calculatedValues?.default;
+      
+      if (!currentMean || !targetMean) {
+        alert('Mean values not found for selected questions');
+        return;
+      }
+      
+      const newComparison = {
+        id: Date.now(),
+        question: selectedCurrentQuestion,
+        entries: [
+          { year, entryId: entry._id, entryName: entry.name, meanValue: parseFloat(currentMean) },
+          { year: selectedTargetYear, entryId: selectedTargetEntry, 
+            entryName: targetEntries.find(e => e._id === selectedTargetEntry)?.name || 'Unknown', 
+            meanValue: parseFloat(targetMean) }
+        ].sort((a, b) => a.year - b.year)
+      };
+      
+      setComparisons(prev => [...prev, newComparison]);
+      setCurrentComparisonIndex(comparisons.length);
+      setShowComparisonModal(false);
+      resetComparisonModal();
+    } catch (error) {
+      console.error('Error adding comparison:', error);
+    }
+  };
+
+  const resetComparisonModal = () => {
+    setSelectedCurrentQuestion('');
+    setSelectedTargetYear('');
+    setSelectedTargetEntry('');
+    setSelectedTargetQuestion('');
+    setTargetEntries([]);
+    setTargetQuestions([]);
+  };
+
+  const deleteComparison = (idx) => {
+    setComparisons(prev => prev.filter((_, i) => i !== idx));
+    setCurrentComparisonIndex(prev => Math.max(0, Math.min(prev, comparisons.length - 2)));
+  };
+
+  const navigateComparison = (direction) => {
+    setCurrentComparisonIndex(prev => {
+      if (direction === 'left') return Math.max(0, prev - 1);
+      return Math.min(comparisons.length - 1, prev + 1);
+    });
+  };
+
   const resetProcess = async () => {
     setProcessStatus('ready');
     setProgress(0);
@@ -997,8 +1146,139 @@ function ProcessPage({ onLogout }) {
               </div>
             </div>
           </div>
+
+          {/* BOTTOM SECTION - Comparison Charts */}
+          <div className="bottom-section" style={{ marginTop: '20px', padding: '20px', background: '#f9f9f9', borderRadius: '12px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+              <h3 style={{ margin: 0 }}>📊 Data Comparisons</h3>
+              <button
+                onClick={openComparisonModal}
+                disabled={!checkHasMean({ selectedStats: selectedStats.map(s => ({ statId: s })) }) || getNumericQuestions().length === 0}
+                style={{
+                  padding: '10px 20px',
+                  background: checkHasMean({ selectedStats: selectedStats.map(s => ({ statId: s })) }) && getNumericQuestions().length > 0 ? '#4CAF50' : '#ddd',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: checkHasMean({ selectedStats: selectedStats.map(s => ({ statId: s })) }) && getNumericQuestions().length > 0 ? 'pointer' : 'not-allowed',
+                  fontSize: '14px',
+                  fontWeight: 'bold'
+                }}
+              >
+                + Add Comparison
+              </button>
+            </div>
+            {comparisons.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '40px', color: '#666' }}>
+                <div style={{ fontSize: '48px', marginBottom: '10px' }}>📈</div>
+                <p>No comparisons yet. Click "Add Comparison" to compare data across work years.</p>
+                {!checkHasMean({ selectedStats: selectedStats.map(s => ({ statId: s })) }) && (
+                  <p style={{ color: '#f44336', fontSize: '14px' }}>Note: You must add "Mean" statistic before creating comparisons.</p>
+                )}
+              </div>
+            ) : (
+              <ComparisonChart
+                comparisons={comparisons}
+                currentIndex={currentComparisonIndex}
+                onNavigate={navigateComparison}
+                onDelete={deleteComparison}
+              />
+            )}
+          </div>
         </div>
       </div>
+
+      {/* Comparison Selection Modal */}
+      {showComparisonModal && (
+        <div className="stats-modal-overlay" onClick={() => { setShowComparisonModal(false); resetComparisonModal(); }}>
+          <div className="stats-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '600px' }}>
+            <div className="stats-modal-header">
+              <h2>📊 Add Data Comparison</h2>
+              <button className="modal-close-btn" onClick={() => { setShowComparisonModal(false); resetComparisonModal(); }}>×</button>
+            </div>
+            
+            <div className="stats-modal-body" style={{ padding: '20px' }}>
+              <div style={{ marginBottom: '20px' }}>
+                <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>
+                  Select Question from Current Entry ({year}):
+                </label>
+                <select
+                  value={selectedCurrentQuestion}
+                  onChange={(e) => setSelectedCurrentQuestion(e.target.value)}
+                  style={{ width: '100%', padding: '10px', fontSize: '14px', borderRadius: '6px', border: '1px solid #ddd' }}
+                >
+                  <option value="">-- Choose a question --</option>
+                  {getNumericQuestions().map(q => <option key={q} value={q}>{q}</option>)}
+                </select>
+              </div>
+
+              <div style={{ marginBottom: '20px' }}>
+                <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>
+                  Select Work Year to Compare:
+                </label>
+                <select
+                  value={selectedTargetYear}
+                  onChange={(e) => handleTargetYearChange(e.target.value)}
+                  style={{ width: '100%', padding: '10px', fontSize: '14px', borderRadius: '6px', border: '1px solid #ddd' }}
+                >
+                  <option value="">-- Choose a work year --</option>
+                  {availableWorkYears.map(wy => <option key={wy._id} value={wy.year}>{wy.year}</option>)}
+                </select>
+              </div>
+
+              {selectedTargetYear && (
+                <div style={{ marginBottom: '20px' }}>
+                  <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>
+                    Select Entry from {selectedTargetYear}:
+                  </label>
+                  <select
+                    value={selectedTargetEntry}
+                    onChange={(e) => handleTargetEntryChange(e.target.value)}
+                    style={{ width: '100%', padding: '10px', fontSize: '14px', borderRadius: '6px', border: '1px solid #ddd' }}
+                  >
+                    <option value="">-- Choose an entry --</option>
+                    {targetEntries.map(ent => <option key={ent._id} value={ent._id}>{ent.name}</option>)}
+                  </select>
+                  {targetEntries.length === 0 && <p style={{ fontSize: '12px', color: '#f44336', marginTop: '5px' }}>No entries with mean values found</p>}
+                </div>
+              )}
+
+              {selectedTargetEntry && (
+                <div style={{ marginBottom: '20px' }}>
+                  <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>
+                    Select Question from Target Entry:
+                  </label>
+                  <select
+                    value={selectedTargetQuestion}
+                    onChange={(e) => setSelectedTargetQuestion(e.target.value)}
+                    style={{ width: '100%', padding: '10px', fontSize: '14px', borderRadius: '6px', border: '1px solid #ddd' }}
+                  >
+                    <option value="">-- Choose a question --</option>
+                    {targetQuestions.map(q => <option key={q} value={q}>{q}</option>)}
+                  </select>
+                </div>
+              )}
+            </div>
+
+            <div className="stats-modal-footer">
+              <button className="modal-btn secondary" onClick={() => { setShowComparisonModal(false); resetComparisonModal(); }}>
+                Cancel
+              </button>
+              <button
+                className="modal-btn primary"
+                onClick={handleAddComparison}
+                disabled={!selectedCurrentQuestion || !selectedTargetYear || !selectedTargetEntry || !selectedTargetQuestion}
+                style={{
+                  opacity: (!selectedCurrentQuestion || !selectedTargetYear || !selectedTargetEntry || !selectedTargetQuestion) ? 0.5 : 1,
+                  cursor: (!selectedCurrentQuestion || !selectedTargetYear || !selectedTargetEntry || !selectedTargetQuestion) ? 'not-allowed' : 'pointer'
+                }}
+              >
+                Add Comparison
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Statistics Selection Modal */}
       {showStatsModal && (
