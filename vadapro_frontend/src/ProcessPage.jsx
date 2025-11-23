@@ -760,24 +760,69 @@ function ProcessPage({ onLogout }) {
     setTargetEntries([]);
     setTargetQuestions([]);
     
-    const wy = availableWorkYears.find(w => w.year === selectedYear);
+    // Convert selectedYear to number for comparison (comes as string from dropdown)
+    const yearNum = Number(selectedYear);
+    const wy = availableWorkYears.find(w => w.year === yearNum);
+    console.log('=== TARGET YEAR CHANGE ===');
+    console.log('Selected year:', selectedYear, 'Type:', typeof selectedYear);
+    console.log('Converted to number:', yearNum);
+    console.log('Available work years:', availableWorkYears.map(w => ({ year: w.year, type: typeof w.year })));
+    console.log('Found WorkYear:', wy);
     if (!wy) return;
     
     try {
       const wyDetail = await workYearService.getWorkYearById(wy._id);
+      console.log('WorkYear details:', wyDetail);
+      
       if (wyDetail.success && wyDetail.workYear.entries) {
+        console.log('Entries in WorkYear:', wyDetail.workYear.entries.length);
+        
+        // Fetch all processes once, outside the loop for efficiency
+        const entryProcesses = await processService.getAllProcesses();
+        console.log('Total processes in system:', entryProcesses.processes?.length);
+        console.log('All process entry IDs:', entryProcesses.processes?.map(p => ({ id: p._id, entry: p.entry, hasStats: p.selectedStats?.length > 0 })));
+        
         const entriesWithMean = [];
         for (const ent of wyDetail.workYear.entries) {
           try {
-            const entryProcesses = await processService.getAllProcesses();
-            const matchingProcess = entryProcesses.processes?.find(p => p.entry === ent._id);
-            if (matchingProcess && checkHasMean(matchingProcess)) {
-              entriesWithMean.push(ent);
+            console.log('\n--- Checking Entry ---');
+            console.log('Entry name:', ent.name);
+            console.log('Entry ID:', ent._id);
+            console.log('Entry ID type:', typeof ent._id);
+            
+            // Convert both IDs to strings for comparison to handle ObjectId vs string mismatch
+            const matchingProcess = entryProcesses.processes?.find(p => {
+              const match = String(p.entry) === String(ent._id);
+              if (match) {
+                console.log('MATCH FOUND! Process ID:', p._id, 'Entry:', p.entry);
+              }
+              return match;
+            });
+            
+            console.log('Found matching process:', matchingProcess ? 'YES' : 'NO');
+            if (matchingProcess) {
+              console.log('Process selectedStats array:', matchingProcess.selectedStats);
+              console.log('selectedStats length:', matchingProcess.selectedStats?.length);
+              const hasMean = checkHasMean(matchingProcess);
+              console.log('Has mean stat:', hasMean);
+              
+              if (hasMean) {
+                entriesWithMean.push(ent);
+                console.log('✓ Entry added to list');
+              } else {
+                console.log('✗ Entry skipped - no mean stat');
+              }
+            } else {
+              console.log('✗ No matching process found for this entry');
             }
           } catch (err) {
             console.error('Error checking entry process:', err);
           }
         }
+        
+        console.log('\n=== FINAL RESULT ===');
+        console.log('Total entries with mean:', entriesWithMean.length);
+        console.log('Entries:', entriesWithMean.map(e => e.name));
         setTargetEntries(entriesWithMean);
       }
     } catch (error) {
@@ -814,9 +859,18 @@ function ProcessPage({ onLogout }) {
       }
       
       const targetStat = targetProcess.selectedStats.find(s => s.statId === 'mean');
-      const targetMeanKey = `${selectedTargetQuestion}|mean`;
-      const targetMean = targetStat?.calculatedValues?.[selectedTargetQuestion] || 
-                         targetStat?.calculatedValues?.default;
+      
+      // calculatedValues is a Map/Object - access it properly
+      // Try the selected question column name first, then fall back to 'default'
+      let targetMean;
+      if (targetStat?.calculatedValues) {
+        // Handle both Map and plain object representations
+        const calcValues = targetStat.calculatedValues;
+        targetMean = calcValues[selectedTargetQuestion] || 
+                     calcValues.get?.(selectedTargetQuestion) ||
+                     calcValues['default'] || 
+                     calcValues.get?.('default');
+      }
       
       if (!currentMean || !targetMean) {
         alert('Mean values not found for selected questions');
