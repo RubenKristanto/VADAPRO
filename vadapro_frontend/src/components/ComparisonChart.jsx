@@ -49,7 +49,7 @@ const ComparisonChart = ({ comparisons, currentIndex, onNavigate, onDelete }) =>
       },
       xAxis: {
         type: 'category',
-        data: comparison.entries.map(e => e.year),
+        data: [...comparison.entries].sort((a, b) => a.year - b.year).map(e => e.year),
         name: 'Work Year',
         nameLocation: 'middle',
         nameGap: 35,
@@ -67,7 +67,7 @@ const ComparisonChart = ({ comparisons, currentIndex, onNavigate, onDelete }) =>
       series: [{
         name: comparison.question,
         type: 'line',
-        data: comparison.entries.map(e => e.meanValue),
+        data: [...comparison.entries].sort((a, b) => a.year - b.year).map(e => e.meanValue),
         smooth: true,
         lineStyle: { width: 3 },
         symbol: 'circle',
@@ -82,9 +82,6 @@ const ComparisonChart = ({ comparisons, currentIndex, onNavigate, onDelete }) =>
             { type: 'max', name: 'Max' },
             { type: 'min', name: 'Min' }
           ]
-        },
-        markLine: {
-          data: [{ type: 'average', name: 'Average' }]
         }
       }]
     };
