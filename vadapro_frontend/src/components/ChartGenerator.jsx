@@ -1,16 +1,36 @@
 import { useState, useEffect, useRef } from 'react';
 import * as echarts from 'echarts';
 import Papa from 'papaparse';
+import processService from '../services/processService';
 import './ChartGenerator.css';
 
-const ChartGenerator = ({ entryId }) => {
+const ChartGenerator = ({ entryId, processId, initialCharts = [], onChartsChange }) => {
   const [showModal, setShowModal] = useState(false);
   const [questions, setQuestions] = useState([]);
   const [selectedQuestion, setSelectedQuestion] = useState(null);
   const [chartType, setChartType] = useState('bar');
-  const [charts, setCharts] = useState([]);
+  const [charts, setCharts] = useState(initialCharts);
   const [currentChartIndex, setCurrentChartIndex] = useState(0);
   const chartRefs = useRef([]);
+
+  useEffect(() => {
+    setCharts(initialCharts);
+  }, [initialCharts]);
+
+  const saveChartsToBackend = async (updatedCharts) => {
+    if (!processId) return;
+    try {
+      await processService.updateChartConfigs(processId, updatedCharts);
+    } catch (error) {
+      console.error('Error saving charts:', error);
+    }
+  };
+
+  const updateCharts = (newCharts) => {
+    setCharts(newCharts);
+    onChartsChange?.(newCharts);
+    saveChartsToBackend(newCharts);
+  };
 
   // Load CSV questions
   useEffect(() => {
@@ -51,7 +71,8 @@ const ChartGenerator = ({ entryId }) => {
         data: counts
       };
       
-      setCharts(prev => [...prev, newChart]);
+      const updatedCharts = [...charts, newChart];
+      updateCharts(updatedCharts);
       setCurrentChartIndex(charts.length);
       setShowModal(false);
       setSelectedQuestion(null);
@@ -101,8 +122,9 @@ const ChartGenerator = ({ entryId }) => {
   }, [charts, currentChartIndex]);
 
   const deleteChart = (idx) => {
-    setCharts(prev => prev.filter((_, i) => i !== idx));
-    setCurrentChartIndex(prev => Math.max(0, Math.min(prev, charts.length - 2)));
+    const updatedCharts = charts.filter((_, i) => i !== idx);
+    updateCharts(updatedCharts);
+    setCurrentChartIndex(prev => Math.max(0, Math.min(prev, updatedCharts.length - 1)));
   };
 
   const navigateChart = (direction) => {

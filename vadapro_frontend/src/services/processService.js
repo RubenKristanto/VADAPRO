@@ -196,7 +196,24 @@ class ProcessService {
     }
   }
 
-  // Error handler for consistent error messaging
+  async updateChartConfigs(id, chartConfigs) {
+    try {
+      const response = await axiosAPI.put(`/process/${id}`, { chartConfigs });
+      return response.data;
+    } catch (error) {
+      throw this.handleError(error);
+    }
+  }
+
+  async updateCompareChartConfigs(id, compareChartConfigs) {
+    try {
+      const response = await axiosAPI.put(`/process/${id}`, { compareChartConfigs });
+      return response.data;
+    } catch (error) {
+      throw this.handleError(error);
+    }
+  }
+
   handleError(error) {
     if (error.response) {
       // Server responded with an error status

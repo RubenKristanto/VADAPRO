@@ -148,7 +148,7 @@ export const updateProcess = async (req, res) => {
         // Update allowed fields
         const allowedUpdates = [
             'name', 'sourceFileName', 'responseCount', 'rawData', 'processedData',
-            'imageUrl', 'imageStoragePath', 'processStatus', 'progress',
+            'chartConfigs', 'compareChartConfigs', 'processStatus', 'progress',
             'year', 'tags', 'danfoConfig', 'processingConfig',
             'errorMessage', 'errorStack'
         ];

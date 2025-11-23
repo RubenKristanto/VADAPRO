@@ -51,7 +51,7 @@ function ProcessPage({ onLogout }) {
   const [processStatus, setProcessStatus] = useState('ready');
   const [progress, setProgress] = useState(0);
   const [logs, setLogs] = useState([]);
-  const [imageUrl, setImageUrl] = useState(null);
+  const [chartConfigs, setChartConfigs] = useState([]);
   const [initError, setInitError] = useState(null);
   const [csvData, setCsvData] = useState(null); // DataFrame from CSV
   const [rawCsvText, setRawCsvText] = useState(null); // Raw CSV text for AI analysis
@@ -256,8 +256,12 @@ function ProcessPage({ onLogout }) {
                 setLogs(process.logs.map(log => log.message));
               }
               
-              if (process.imageUrl) {
-                setImageUrl(process.imageUrl);
+              if (process.chartConfigs && process.chartConfigs.length > 0) {
+                setChartConfigs(process.chartConfigs);
+              }
+              
+              if (process.compareChartConfigs && process.compareChartConfigs.length > 0) {
+                setComparisons(process.compareChartConfigs);
               }
               
               if (process.chatMessages && process.chatMessages.length > 0) {
@@ -794,8 +798,8 @@ function ProcessPage({ onLogout }) {
       }
       
       const newEntry = {
-        year: selectedTargetYear,
-        entryId: selectedTargetEntry,
+        year: parseInt(selectedTargetYear),
+        entryId: String(selectedTargetEntry),
         entryName: targetEntries.find(e => e._id === selectedTargetEntry)?.name || 'Unknown',
         question: selectedTargetQuestion,
         meanValue: parseFloat(targetMean)
@@ -926,12 +930,12 @@ function ProcessPage({ onLogout }) {
       
       // Build entries array with current entry and all selected work year entries
       const entries = [
-        { year, entryId: entry._id, entryName: entry.name, meanValue: parseFloat(currentMean) },
+        { year: parseInt(year), entryId: String(entry._id || entry.id), entryName: entry.name, meanValue: parseFloat(currentMean) },
         ...selectedWorkYearEntries.map(item => ({
-          year: item.year,
-          entryId: item.entryId,
+          year: parseInt(item.year),
+          entryId: String(item.entryId),
           entryName: item.entryName,
-          meanValue: item.meanValue
+          meanValue: parseFloat(item.meanValue)
         }))
       ].sort((a, b) => a.year - b.year);
       
@@ -941,7 +945,11 @@ function ProcessPage({ onLogout }) {
         entries: entries
       };
       
-      setComparisons(prev => [...prev, newComparison]);
+      const updatedComparisons = [...comparisons, newComparison];
+      setComparisons(updatedComparisons);
+      if (processId) {
+        processService.updateCompareChartConfigs(processId, updatedComparisons).catch(err => console.error('Error saving comparisons:', err));
+      }
       setCurrentComparisonIndex(comparisons.length);
       setShowComparisonModal(false);
       resetComparisonModal();
@@ -962,8 +970,12 @@ function ProcessPage({ onLogout }) {
   };
 
   const deleteComparison = (idx) => {
-    setComparisons(prev => prev.filter((_, i) => i !== idx));
-    setCurrentComparisonIndex(prev => Math.max(0, Math.min(prev, comparisons.length - 2)));
+    const updatedComparisons = comparisons.filter((_, i) => i !== idx);
+    setComparisons(updatedComparisons);
+    if (processId) {
+      processService.updateCompareChartConfigs(processId, updatedComparisons).catch(err => console.error('Error saving comparisons:', err));
+    }
+    setCurrentComparisonIndex(prev => Math.max(0, Math.min(prev, updatedComparisons.length - 1)));
   };
 
   const navigateComparison = (direction) => {
@@ -1031,15 +1043,12 @@ function ProcessPage({ onLogout }) {
             {/* UPPER BODY SECTION - Image Placeholder */}
             <div className="upper-body-section">
               <div className="image-placeholder">
-                {imageUrl ? (
-                  <img 
-                    src={imageUrl} 
-                    alt="Process visualization" 
-                    className="process-image"
-                  />
-                ) : (
-                    <ChartGenerator entryId={entry?._id || entry?.id} />
-                )}
+                <ChartGenerator 
+                  entryId={entry?._id || entry?.id} 
+                  processId={processId}
+                  initialCharts={chartConfigs}
+                  onChartsChange={setChartConfigs}
+                />
               </div>
             </div>
 

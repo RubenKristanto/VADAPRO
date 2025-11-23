@@ -110,17 +110,25 @@ const processSchema = new mongoose.Schema({
         maxlength: 1000
     },
     
-    // Image visualization
-    imageUrl: {
-        type: String,
-        trim: true,
-        maxlength: 1000
-    },
-    imageStoragePath: {
-        type: String,
-        trim: true,
-        maxlength: 1000
-    },
+    chartConfigs: [{
+        id: { type: Number, required: true },
+        question: { type: String, required: true },
+        chartType: { type: String, required: true },
+        data: { type: mongoose.Schema.Types.Mixed, required: true },
+        timestamp: { type: Date, default: Date.now }
+    }],
+    
+    compareChartConfigs: [{
+        id: Number,
+        question: String,
+        entries: [{
+            year: Number,
+            entryId: String,
+            entryName: String,
+            meanValue: Number
+        }],
+        timestamp: { type: Date, default: Date.now }
+    }],
     
     // Process status and progress
     processStatus: {
