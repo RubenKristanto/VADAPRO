@@ -237,10 +237,20 @@ export const deleteWorkYear = async (req, res) => {
     
     await Process.deleteMany({ entry: { $in: workYear.entries.map(e => e._id) } });
     
-    // Clean up GridFS files for this work year
     if (workYear.entries && workYear.entries.length > 0) {
       const bucket = new GridFSBucket(mongoose.connection.db, { bucketName: 'upload' });
       for (const entry of workYear.entries) {
+        if (entry.geminiFileUri) {
+          try {
+            const fileNameMatch = entry.geminiFileUri.match(/files\/([^\/]+)/);
+            if (fileNameMatch && fileNameMatch[1]) {
+              await genai.files.delete({ name: fileNameMatch[1] });
+              console.log(`✅ Gemini File API deletion successful: ${entry.geminiFileUri}`);
+            }
+          } catch (geminiErr) {
+            console.log(`❌ Gemini File API deletion failed: ${entry.geminiFileUri} - ${geminiErr.message}`);
+          }
+        }
         if (entry.file && entry.file.filename) {
           try {
             await bucket.delete(new mongoose.Types.ObjectId(entry.file.filename));
@@ -251,7 +261,6 @@ export const deleteWorkYear = async (req, res) => {
       }
     }
     
-    // Delete the work year
     await WorkYear.findByIdAndDelete(id);
     res.status(200).json({ success: true, message: 'Work year deleted' });
   } catch (err) {
@@ -269,12 +278,25 @@ export const deleteEntry = async (req, res) => {
     if (!workYear) return res.status(404).json({ success: false, message: 'Work year not found' });
     
     const entry = workYear.entries.id(entryId);
-    if (entry && entry.file && entry.file.filename) {
-      const bucket = new GridFSBucket(mongoose.connection.db, { bucketName: 'upload' });
-      try {
-        await bucket.delete(new mongoose.Types.ObjectId(entry.file.filename));
-      } catch (err) {
-        console.error('Error deleting file from GridFS:', err);
+    if (entry) {
+      if (entry.geminiFileUri) {
+        try {
+          const fileNameMatch = entry.geminiFileUri.match(/files\/([^\/]+)/);
+          if (fileNameMatch && fileNameMatch[1]) {
+            await genai.files.delete({ name: fileNameMatch[1] });
+            console.log(`✅ Gemini File API deletion successful: ${entry.geminiFileUri}`);
+          }
+        } catch (geminiErr) {
+          console.log(`❌ Gemini File API deletion failed: ${entry.geminiFileUri} - ${geminiErr.message}`);
+        }
+      }
+      if (entry.file && entry.file.filename) {
+        const bucket = new GridFSBucket(mongoose.connection.db, { bucketName: 'upload' });
+        try {
+          await bucket.delete(new mongoose.Types.ObjectId(entry.file.filename));
+        } catch (err) {
+          console.error('Error deleting file from GridFS:', err);
+        }
       }
     }
     
