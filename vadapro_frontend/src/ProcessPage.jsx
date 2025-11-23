@@ -1266,8 +1266,8 @@ function ProcessPage({ onLogout }) {
           </div>
 
           {/* BOTTOM SECTION - Comparison Charts */}
-          <div className="bottom-section" style={{ marginTop: '20px', padding: '20px', background: '#f9f9f9', borderRadius: '12px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+          <div className="bottom-section" style={{ marginTop: '20px', padding: '50px', background: '#f9f9f9', borderRadius: '12px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0px' }}>
               <h3 style={{ margin: 0 }}>📊 Data Comparisons</h3>
               <button
                 onClick={openComparisonModal}

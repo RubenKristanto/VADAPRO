@@ -100,21 +100,23 @@ const ComparisonChart = ({ comparisons, currentIndex, onNavigate, onDelete }) =>
   if (comparisons.length === 0) return null;
 
   return (
-    <div style={{ width: '100%', height: '100%', position: 'relative' }}>
+    <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}>
+      {/* Navigation Bar */}
       <div style={{
-        position: 'absolute',
-        top: 10,
-        left: '50%',
-        transform: 'translateX(-50%)',
         display: 'flex',
-        gap: 10,
-        alignItems: 'center',
-        background: 'rgba(255,255,255,0.9)',
-        padding: 10,
-        borderRadius: 8,
-        boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-        zIndex: 10
+        justifyContent: 'center',
+        marginBottom: 20
       }}>
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 10,
+          background: 'rgba(255,255,255,0.9)',
+          padding: 10,
+          borderRadius: 8,
+          boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+          width: 'fit-content'
+        }}>
         {comparisons.length > 1 && (
           <>
             <button
@@ -131,7 +133,7 @@ const ComparisonChart = ({ comparisons, currentIndex, onNavigate, onDelete }) =>
             >
               ◀
             </button>
-            <span style={{ fontSize: 14, fontWeight: 'bold' }}>
+            <span style={{ fontSize: 14, fontWeight: 'bold', color: 'black' }}>
               {currentIndex + 1} / {comparisons.length}
             </span>
             <button
@@ -165,8 +167,10 @@ const ComparisonChart = ({ comparisons, currentIndex, onNavigate, onDelete }) =>
           ✕
         </button>
       </div>
+      </div>
       
-      <div ref={chartRef} style={{ width: '100%', height: '50vh', marginTop: '60px' }} />
+      {/* Chart Container */}
+      <div ref={chartRef} style={{ width: '100%', flex: 1, minHeight: '400px' }} />
     </div>
   );
 };
