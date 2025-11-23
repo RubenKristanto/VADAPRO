@@ -85,6 +85,8 @@ function ProcessPage({ onLogout }) {
   const [selectedTargetQuestion, setSelectedTargetQuestion] = useState('');
   const [targetEntries, setTargetEntries] = useState([]);
   const [targetQuestions, setTargetQuestions] = useState([]);
+  // New state for multiple work year selections
+  const [selectedWorkYearEntries, setSelectedWorkYearEntries] = useState([]);
   
   // Comprehensive list of statistical parameters available in danfo.js
   // Organized by category for better UX
@@ -753,6 +755,70 @@ function ProcessPage({ onLogout }) {
     }
   };
 
+  const handleAddWorkYearEntry = async () => {
+    if (!selectedTargetYear || !selectedTargetEntry || !selectedTargetQuestion) return;
+    
+    // Check if this entry is already added
+    const alreadyExists = selectedWorkYearEntries.some(
+      item => item.entryId === selectedTargetEntry && item.year === selectedTargetYear
+    );
+    
+    if (alreadyExists) {
+      alert('This work year entry has already been added.');
+      return;
+    }
+    
+    try {
+      const targetProcesses = await processService.getAllProcesses();
+      const targetProcess = targetProcesses.processes?.find(p => p.entry === selectedTargetEntry);
+      
+      if (!targetProcess || !checkHasMean(targetProcess)) {
+        alert('Target entry does not have mean calculated');
+        return;
+      }
+      
+      const targetStat = targetProcess.selectedStats.find(s => s.statId === 'mean');
+      
+      let targetMean;
+      if (targetStat?.calculatedValues) {
+        const calcValues = targetStat.calculatedValues;
+        targetMean = calcValues[selectedTargetQuestion] || 
+                     calcValues.get?.(selectedTargetQuestion) ||
+                     calcValues['default'] || 
+                     calcValues.get?.('default');
+      }
+      
+      if (!targetMean) {
+        alert('Mean value not found for selected question');
+        return;
+      }
+      
+      const newEntry = {
+        year: selectedTargetYear,
+        entryId: selectedTargetEntry,
+        entryName: targetEntries.find(e => e._id === selectedTargetEntry)?.name || 'Unknown',
+        question: selectedTargetQuestion,
+        meanValue: parseFloat(targetMean)
+      };
+      
+      setSelectedWorkYearEntries(prev => [...prev, newEntry]);
+      
+      // Reset selection fields for next entry
+      setSelectedTargetYear('');
+      setSelectedTargetEntry('');
+      setSelectedTargetQuestion('');
+      setTargetEntries([]);
+      setTargetQuestions([]);
+    } catch (error) {
+      console.error('Error adding work year entry:', error);
+      alert('Error adding work year entry');
+    }
+  };
+  
+  const handleRemoveWorkYearEntry = (index) => {
+    setSelectedWorkYearEntries(prev => prev.filter((_, i) => i !== index));
+  };
+
   const handleTargetYearChange = async (selectedYear) => {
     setSelectedTargetYear(selectedYear);
     setSelectedTargetEntry('');
@@ -845,47 +911,34 @@ function ProcessPage({ onLogout }) {
   };
 
   const handleAddComparison = async () => {
-    if (!selectedCurrentQuestion || !selectedTargetYear || !selectedTargetEntry || !selectedTargetQuestion) return;
+    if (!selectedCurrentQuestion || selectedWorkYearEntries.length === 0) {
+      alert('Please select a question and add at least one work year entry to compare.');
+      return;
+    }
     
     try {
       const currentMean = statisticsData[`${selectedCurrentQuestion}|mean`] || statisticsData['mean'];
       
-      const targetProcesses = await processService.getAllProcesses();
-      const targetProcess = targetProcesses.processes?.find(p => p.entry === selectedTargetEntry);
-      
-      if (!targetProcess || !checkHasMean(targetProcess)) {
-        alert('Target entry does not have mean calculated');
+      if (!currentMean) {
+        alert('Mean value not found for the current question');
         return;
       }
       
-      const targetStat = targetProcess.selectedStats.find(s => s.statId === 'mean');
-      
-      // calculatedValues is a Map/Object - access it properly
-      // Try the selected question column name first, then fall back to 'default'
-      let targetMean;
-      if (targetStat?.calculatedValues) {
-        // Handle both Map and plain object representations
-        const calcValues = targetStat.calculatedValues;
-        targetMean = calcValues[selectedTargetQuestion] || 
-                     calcValues.get?.(selectedTargetQuestion) ||
-                     calcValues['default'] || 
-                     calcValues.get?.('default');
-      }
-      
-      if (!currentMean || !targetMean) {
-        alert('Mean values not found for selected questions');
-        return;
-      }
+      // Build entries array with current entry and all selected work year entries
+      const entries = [
+        { year, entryId: entry._id, entryName: entry.name, meanValue: parseFloat(currentMean) },
+        ...selectedWorkYearEntries.map(item => ({
+          year: item.year,
+          entryId: item.entryId,
+          entryName: item.entryName,
+          meanValue: item.meanValue
+        }))
+      ].sort((a, b) => a.year - b.year);
       
       const newComparison = {
         id: Date.now(),
         question: selectedCurrentQuestion,
-        entries: [
-          { year, entryId: entry._id, entryName: entry.name, meanValue: parseFloat(currentMean) },
-          { year: selectedTargetYear, entryId: selectedTargetEntry, 
-            entryName: targetEntries.find(e => e._id === selectedTargetEntry)?.name || 'Unknown', 
-            meanValue: parseFloat(targetMean) }
-        ].sort((a, b) => a.year - b.year)
+        entries: entries
       };
       
       setComparisons(prev => [...prev, newComparison]);
@@ -894,6 +947,7 @@ function ProcessPage({ onLogout }) {
       resetComparisonModal();
     } catch (error) {
       console.error('Error adding comparison:', error);
+      alert('Error adding comparison');
     }
   };
 
@@ -904,6 +958,7 @@ function ProcessPage({ onLogout }) {
     setSelectedTargetQuestion('');
     setTargetEntries([]);
     setTargetQuestions([]);
+    setSelectedWorkYearEntries([]);
   };
 
   const deleteComparison = (idx) => {
@@ -1266,50 +1321,126 @@ function ProcessPage({ onLogout }) {
                 </select>
               </div>
 
-              <div style={{ marginBottom: '20px' }}>
-                <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>
-                  Select Work Year to Compare:
-                </label>
-                <select
-                  value={selectedTargetYear}
-                  onChange={(e) => handleTargetYearChange(e.target.value)}
-                  style={{ width: '100%', padding: '10px', fontSize: '14px', borderRadius: '6px', border: '1px solid #ddd' }}
+              <div style={{ marginBottom: '20px', padding: '15px', background: '#f5f5f5', borderRadius: '8px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                  <label style={{ fontWeight: 'bold', fontSize: '16px', color: 'black' }}>Add Work Years to Compare:</label>
+                  {selectedWorkYearEntries.length > 0 && (
+                    <span style={{ fontSize: '14px', color: '#666' }}>({selectedWorkYearEntries.length} selected)</span>
+                  )}
+                </div>
+                
+                <div style={{ marginBottom: '15px' }}>
+                  <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold', fontSize: '14px', color: 'black' }}>
+                    Select Work Year:
+                  </label>
+                  <select
+                    value={selectedTargetYear}
+                    onChange={(e) => handleTargetYearChange(e.target.value)}
+                    style={{ width: '100%', padding: '10px', fontSize: '14px', borderRadius: '6px', border: '1px solid #ddd' }}
+                  >
+                    <option value="">-- Choose a work year --</option>
+                    {availableWorkYears.map(wy => <option key={wy._id} value={wy.year}>{wy.year}</option>)}
+                  </select>
+                </div>
+
+                {selectedTargetYear && (
+                  <div style={{ marginBottom: '15px' }}>
+                    <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold', fontSize: '14px', color: 'black' }}>
+                      Select Entry from {selectedTargetYear}:
+                    </label>
+                    <select
+                      value={selectedTargetEntry}
+                      onChange={(e) => handleTargetEntryChange(e.target.value)}
+                      style={{ width: '100%', padding: '10px', fontSize: '14px', borderRadius: '6px', border: '1px solid #ddd' }}
+                    >
+                      <option value="">-- Choose an entry --</option>
+                      {targetEntries.map(ent => <option key={ent._id} value={ent._id}>{ent.name}</option>)}
+                    </select>
+                    {targetEntries.length === 0 && <p style={{ fontSize: '12px', color: '#f44336', marginTop: '5px' }}>No entries with mean values found</p>}
+                  </div>
+                )}
+
+                {selectedTargetEntry && (
+                  <div style={{ marginBottom: '15px' }}>
+                    <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold', fontSize: '14px', color: 'black' }}>
+                      Select Question from Target Entry:
+                    </label>
+                    <select
+                      value={selectedTargetQuestion}
+                      onChange={(e) => setSelectedTargetQuestion(e.target.value)}
+                      style={{ width: '100%', padding: '10px', fontSize: '14px', borderRadius: '6px', border: '1px solid #ddd' }}
+                    >
+                      <option value="">-- Choose a question --</option>
+                      {targetQuestions.map(q => <option key={q} value={q}>{q}</option>)}
+                    </select>
+                  </div>
+                )}
+
+                <button
+                  onClick={handleAddWorkYearEntry}
+                  disabled={!selectedTargetYear || !selectedTargetEntry || !selectedTargetQuestion}
+                  style={{
+                    width: '100%',
+                    padding: '10px',
+                    background: (!selectedTargetYear || !selectedTargetEntry || !selectedTargetQuestion) ? '#ddd' : '#4CAF50',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    cursor: (!selectedTargetYear || !selectedTargetEntry || !selectedTargetQuestion) ? 'not-allowed' : 'pointer',
+                    fontSize: '14px',
+                    fontWeight: 'bold'
+                  }}
                 >
-                  <option value="">-- Choose a work year --</option>
-                  {availableWorkYears.map(wy => <option key={wy._id} value={wy.year}>{wy.year}</option>)}
-                </select>
+                  + Add This Entry
+                </button>
               </div>
 
-              {selectedTargetYear && (
+              {selectedWorkYearEntries.length > 0 && (
                 <div style={{ marginBottom: '20px' }}>
-                  <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>
-                    Select Entry from {selectedTargetYear}:
+                  <label style={{ display: 'block', marginBottom: '10px', fontWeight: 'bold' }}>
+                    Selected Work Year Entries:
                   </label>
-                  <select
-                    value={selectedTargetEntry}
-                    onChange={(e) => handleTargetEntryChange(e.target.value)}
-                    style={{ width: '100%', padding: '10px', fontSize: '14px', borderRadius: '6px', border: '1px solid #ddd' }}
-                  >
-                    <option value="">-- Choose an entry --</option>
-                    {targetEntries.map(ent => <option key={ent._id} value={ent._id}>{ent.name}</option>)}
-                  </select>
-                  {targetEntries.length === 0 && <p style={{ fontSize: '12px', color: '#f44336', marginTop: '5px' }}>No entries with mean values found</p>}
-                </div>
-              )}
-
-              {selectedTargetEntry && (
-                <div style={{ marginBottom: '20px' }}>
-                  <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>
-                    Select Question from Target Entry:
-                  </label>
-                  <select
-                    value={selectedTargetQuestion}
-                    onChange={(e) => setSelectedTargetQuestion(e.target.value)}
-                    style={{ width: '100%', padding: '10px', fontSize: '14px', borderRadius: '6px', border: '1px solid #ddd' }}
-                  >
-                    <option value="">-- Choose a question --</option>
-                    {targetQuestions.map(q => <option key={q} value={q}>{q}</option>)}
-                  </select>
+                  <div style={{ maxHeight: '200px', overflowY: 'auto', border: '1px solid #ddd', borderRadius: '6px', background: 'white' }}>
+                    {selectedWorkYearEntries.map((item, index) => (
+                      <div
+                        key={index}
+                        style={{
+                          padding: '12px',
+                          borderBottom: index < selectedWorkYearEntries.length - 1 ? '1px solid #eee' : 'none',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center'
+                        }}
+                      >
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>
+                            {item.year} - {item.entryName}
+                          </div>
+                          <div style={{ fontSize: '12px', color: '#666' }}>
+                            Question: {item.question}
+                          </div>
+                          <div style={{ fontSize: '12px', color: '#666' }}>
+                            Mean: {item.meanValue.toFixed(2)}
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => handleRemoveWorkYearEntry(index)}
+                          style={{
+                            padding: '6px 10px',
+                            background: '#f44336',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                            fontSize: '12px',
+                            fontWeight: 'bold'
+                          }}
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
@@ -1321,13 +1452,13 @@ function ProcessPage({ onLogout }) {
               <button
                 className="modal-btn primary"
                 onClick={handleAddComparison}
-                disabled={!selectedCurrentQuestion || !selectedTargetYear || !selectedTargetEntry || !selectedTargetQuestion}
+                disabled={!selectedCurrentQuestion || selectedWorkYearEntries.length === 0}
                 style={{
-                  opacity: (!selectedCurrentQuestion || !selectedTargetYear || !selectedTargetEntry || !selectedTargetQuestion) ? 0.5 : 1,
-                  cursor: (!selectedCurrentQuestion || !selectedTargetYear || !selectedTargetEntry || !selectedTargetQuestion) ? 'not-allowed' : 'pointer'
+                  opacity: (!selectedCurrentQuestion || selectedWorkYearEntries.length === 0) ? 0.5 : 1,
+                  cursor: (!selectedCurrentQuestion || selectedWorkYearEntries.length === 0) ? 'not-allowed' : 'pointer'
                 }}
               >
-                Add Comparison
+                Create Comparison ({selectedWorkYearEntries.length} {selectedWorkYearEntries.length === 1 ? 'entry' : 'entries'})
               </button>
             </div>
           </div>
