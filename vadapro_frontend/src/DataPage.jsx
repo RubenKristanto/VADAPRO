@@ -18,17 +18,17 @@ function DataPage({ onLogout }) {
   const [showAddModal, setShowAddModal] = useState(false);
   const [newEntryName, setNewEntryName] = useState('');
   const [workYearData, setWorkYearData] = useState(null);
-  // file inputs removed - uploads are handled per-entry via the entry upload button
   
-  // Delete confirmation states
+  const [pendingFiles, setPendingFiles] = useState({});
+  
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [entryToDelete, setEntryToDelete] = useState(null);
   const [deleteConfirmName, setDeleteConfirmName] = useState('');
   const [confirmationStep, setConfirmationStep] = useState('name');
   
-  // Process confirmation states
   const [showProcessModal, setShowProcessModal] = useState(false);
   const [entryToProcess, setEntryToProcess] = useState(null);
+  const [isUploading, setIsUploading] = useState(false);
 
   const openAddModal = () => {
     setShowAddModal(true);
@@ -168,13 +168,20 @@ function DataPage({ onLogout }) {
 
   const finalDelete = async () => {
     try {
-      if (workYearData && workYearData._id && entryToDelete.id) {
-        await workYearService.deleteEntry(workYearData._id, entryToDelete.id);
+      const entryIdToDelete = entryToDelete.id;
+      if (workYearData && workYearData._id && entryIdToDelete) {
+        await workYearService.deleteEntry(workYearData._id, entryIdToDelete);
         const single = await workYearService.getWorkYearById(workYearData._id);
         if (single && single.success) setEntries(mapEntriesFromWorkYear(single.workYear));
       } else {
-        setEntries(entries.filter(entry => entry.id !== entryToDelete.id));
+        setEntries(entries.filter(entry => entry.id !== entryIdToDelete));
       }
+      
+      setPendingFiles(prev => {
+        const updated = { ...prev };
+        delete updated[entryIdToDelete];
+        return updated;
+      });
     } catch (err) {
       console.error('Delete entry error', err);
       alert('Failed to delete entry');
@@ -182,47 +189,36 @@ function DataPage({ onLogout }) {
     cancelDelete();
   };
 
-  const handleFileUpload = (entryId, e) => {
+  const handleFileSelect = (entryId, e) => {
     e.stopPropagation();
     const file = e.target.files[0];
     if (!file) return;
 
     (async () => {
       try {
-        const df = await dfd.readCSV(file); // Count rows from uploaded CSV
-        if (workYearData && workYearData._id) {
-          const resp = await workYearService.uploadDatasheets(workYearData._id, entryId, [file]);
-          if (resp && resp.success) {
-            // Refresh from server
-            const single = await workYearService.getWorkYearById(workYearData._id);
-            if (single && single.success) {
-              setWorkYearData(single.workYear);
-              const mappedEntries = mapEntriesFromWorkYear(single.workYear);
-              const updatedEntries = mappedEntries.map(entry => 
-                entry.id === entryId ? { ...entry, responseCount: df.shape[0] } : entry
-              );
-              setEntries(updatedEntries);
-            }
-            return;
+        const df = await dfd.readCSV(file);
+        const responseCount = df.shape[0];
+        
+        setPendingFiles(prev => ({
+          ...prev,
+          [entryId]: { file, responseCount }
+        }));
+        
+        const updatedEntries = entries.map(entry => {
+          if (entry.id === entryId) {
+            return {
+              ...entry,
+              sourceFile: file.name,
+              responseCount: responseCount,
+              geminiFileUri: null
+            };
           }
-          alert(resp.message || 'Upload failed');
-        } else {
-          // No workYear selected: update locally (offline mode)
-          const updatedEntries = entries.map(entry => {
-            if (entry.id === entryId) {
-              return {
-                ...entry,
-                sourceFile: file.name,
-                responseCount: df.shape[0]
-              };
-            }
-            return entry;
-          });
-          setEntries(updatedEntries);
-        }
+          return entry;
+        });
+        setEntries(updatedEntries);
       } catch (err) {
-        console.error('File upload error', err);
-        alert('Upload failed — check console for details');
+        console.error('File selection error', err);
+        alert('Failed to read file — check console for details');
       }
     })();
   };
@@ -240,11 +236,48 @@ function DataPage({ onLogout }) {
     setEntryToProcess(null);
   };
 
-  const startProcess = () => {
-    navigate(`/organizations/${organizationId}/programs/${programId}/year/${year}/data/${entryToProcess.id}/process`, {
-      state: { entry: entryToProcess, program, year, organization }
-    });
-    closeProcessModal();
+  const startProcess = async () => {
+    const entryId = entryToProcess.id;
+    const pendingFile = pendingFiles[entryId];
+    
+    if (pendingFile && workYearData && workYearData._id) {
+      setIsUploading(true);
+      try {
+        const resp = await workYearService.uploadDatasheets(workYearData._id, entryId, [pendingFile.file]);
+        if (resp && resp.success) {
+          const single = await workYearService.getWorkYearById(workYearData._id);
+          if (single && single.success) {
+            setWorkYearData(single.workYear);
+            const updatedEntry = single.workYear.entries.find(e => e._id === entryId);
+            
+            setPendingFiles(prev => {
+              const updated = { ...prev };
+              delete updated[entryId];
+              return updated;
+            });
+            
+            navigate(`/organizations/${organizationId}/programs/${programId}/year/${year}/data/${entryId}/process`, {
+              state: { entry: updatedEntry, program, year, organization }
+            });
+            closeProcessModal();
+          } else {
+            alert('Failed to refresh entry data');
+          }
+        } else {
+          alert(resp.message || 'Upload failed');
+        }
+      } catch (err) {
+        console.error('File upload error', err);
+        alert('Upload failed — check console for details');
+      } finally {
+        setIsUploading(false);
+      }
+    } else {
+      navigate(`/organizations/${organizationId}/programs/${programId}/year/${year}/data/${entryId}/process`, {
+        state: { entry: entryToProcess, program, year, organization }
+      });
+      closeProcessModal();
+    }
   };
 
   return (
@@ -312,12 +345,13 @@ function DataPage({ onLogout }) {
                             <span className="info-label">Source:</span>
                             <span className="source-filename">
                               {entry.sourceFile || 'No file uploaded'}
+                              {pendingFiles[entry.id] && <span style={{color: '#ffa500', marginLeft: '8px'}}>(pending upload)</span>}
                             </span>
                             {!entry.sourceFile && (
                               <label className="upload-btn-wrapper">
                                 <input
                                   type="file"
-                                  onChange={(e) => handleFileUpload(entry.id, e)}
+                                  onChange={(e) => handleFileSelect(entry.id, e)}
                                   style={{ display: 'none' }}
                                   accept=".csv,.xlsx,.xls"
                                 />
@@ -455,17 +489,25 @@ function DataPage({ onLogout }) {
             <p className="modal-description">
               You are about to process "<strong>{entryToProcess?.name}</strong>".
               <br />
+              {pendingFiles[entryToProcess?.id] && (
+                <>
+                  <br />
+                  The file will be uploaded before processing begins.
+                  <br />
+                </>
+              )}
               Click "Start Process" to continue to the processing page.
             </p>
             <div className="modal-actions">
-              <button onClick={closeProcessModal} className="modal-cancel-btn">
+              <button onClick={closeProcessModal} className="modal-cancel-btn" disabled={isUploading}>
                 Cancel
               </button>
               <button 
                 onClick={startProcess} 
                 className="modal-confirm-btn modal-process-btn"
+                disabled={isUploading}
               >
-                Start Process
+                {isUploading ? 'Uploading...' : 'Start Process'}
               </button>
             </div>
           </div>
