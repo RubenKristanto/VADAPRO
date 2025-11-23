@@ -273,10 +273,43 @@ function DataPage({ onLogout }) {
         setIsUploading(false);
       }
     } else {
-      navigate(`/organizations/${organizationId}/programs/${programId}/year/${year}/data/${entryId}/process`, {
-        state: { entry: entryToProcess, program, year, organization }
-      });
-      closeProcessModal();
+      if (entryToProcess.geminiFileUri && workYearData && workYearData._id) {
+        setIsUploading(true);
+        try {
+          const checkResp = await fetch(`https://generativelanguage.googleapis.com/v1beta/${entryToProcess.geminiFileUri.split('https://generativelanguage.googleapis.com/v1beta/')[1]}?key=${import.meta.env.VITE_GEMINI_API_KEY}`);
+          
+          if (!checkResp.ok) {
+            const reuploadResp = await workYearService.reuploadToGemini(workYearData._id, entryId);
+            if (reuploadResp && reuploadResp.success) {
+              const single = await workYearService.getWorkYearById(workYearData._id);
+              if (single && single.success) {
+                const updatedEntry = single.workYear.entries.find(e => e._id === entryId);
+                navigate(`/organizations/${organizationId}/programs/${programId}/year/${year}/data/${entryId}/process`, {
+                  state: { entry: updatedEntry, program, year, organization }
+                });
+                closeProcessModal();
+              }
+            } else {
+              alert('Failed to reupload file to Gemini');
+            }
+          } else {
+            navigate(`/organizations/${organizationId}/programs/${programId}/year/${year}/data/${entryId}/process`, {
+              state: { entry: entryToProcess, program, year, organization }
+            });
+            closeProcessModal();
+          }
+        } catch (err) {
+          console.error('Gemini validation error', err);
+          alert('Failed to validate file — check console for details');
+        } finally {
+          setIsUploading(false);
+        }
+      } else {
+        navigate(`/organizations/${organizationId}/programs/${programId}/year/${year}/data/${entryId}/process`, {
+          state: { entry: entryToProcess, program, year, organization }
+        });
+        closeProcessModal();
+      }
     }
   };
 

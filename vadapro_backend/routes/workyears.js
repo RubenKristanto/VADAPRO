@@ -19,7 +19,8 @@ router.get('/:id', workYearController.getWorkYearById);
 // Upload file to entry
 router.post('/:id/entries/:entryId/datasheets', upload.array('datasheets', 1), workYearController.uploadDatasheets);
 
-// Create an entry for a work year
+router.post('/:id/entries/:entryId/reupload-gemini', workYearController.reuploadToGemini);
+
 router.post('/:id/entries', workYearController.createEntry);
 
 // Update an entry

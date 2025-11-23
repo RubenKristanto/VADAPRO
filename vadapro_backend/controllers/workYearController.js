@@ -144,7 +144,7 @@ export const uploadDatasheets = async (req, res) => {
     if (!req.files || req.files.length === 0) return res.status(400).json({ success: false, message: 'No files uploaded' });
 
     const bucket = new GridFSBucket(mongoose.connection.db, { bucketName: 'upload' });
-    const file = req.files[0]; // Take first file only
+    const file = req.files[0];
 
     const uploadStream = bucket.openUploadStream(file.originalname, {
       metadata: { workYearId: id, entryId: entryId, mimetype: file.mimetype, size: file.size }
@@ -156,7 +156,6 @@ export const uploadDatasheets = async (req, res) => {
       uploadStream.on('error', reject);
     });
 
-    // create metadata for csv file so frontend can display summary of the file
     const fileMeta = {
       filename: uploadStream.id.toString(),
       originalName: file.originalname,
@@ -167,12 +166,10 @@ export const uploadDatasheets = async (req, res) => {
     entry.file = fileMeta;
     entry.sourceFile = file.originalname;
     
-    // Upload to Gemini File API for AI reference
     try {
       const tempPath = path.join(__dirname, '..', 'uploads', 'csv', `temp_${Date.now()}_${file.originalname}`);
       await fs.writeFile(tempPath, file.buffer);
 
-      // upload file using built-in gemini file API upload function
       const uploadResult = await genai.files.upload({
         file: tempPath,
         config: {
@@ -182,13 +179,11 @@ export const uploadDatasheets = async (req, res) => {
       });
       const fileName = uploadResult.name;
 
-      // test if file successfully uploaded and can be retrieved back
       const fetchedFile = await genai.files.get({ name: fileName });
       console.log(fetchedFile);
 
-      // Store URI for later reference in AI queries
       entry.geminiFileUri = uploadResult.uri;
-      await fs.unlink(tempPath);  // clean up temp patht
+      await fs.unlink(tempPath);
       console.log(`✅ Gemini File API upload successful: ${uploadResult.uri}`);
     } catch (geminiErr) {
       console.error('⚠️ Gemini File API upload failed:', geminiErr.message);
@@ -307,6 +302,55 @@ export const deleteEntry = async (req, res) => {
     res.status(200).json({ success: true, message: 'Entry deleted', workYear });
   } catch (err) {
     console.error('deleteEntry error', err);
+    res.status(500).json({ success: false, message: 'Internal server error', error: err.message });
+  }
+};
+
+export const reuploadToGemini = async (req, res) => {
+  try {
+    const { id, entryId } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ success: false, message: 'Invalid workYear id' });
+    if (!mongoose.Types.ObjectId.isValid(entryId)) return res.status(400).json({ success: false, message: 'Invalid entry id' });
+
+    const workYear = await WorkYear.findById(id);
+    if (!workYear) return res.status(404).json({ success: false, message: 'Work year not found' });
+    
+    const entry = workYear.entries.id(entryId);
+    if (!entry) return res.status(404).json({ success: false, message: 'Entry not found' });
+    if (!entry.file || !entry.file.filename) return res.status(400).json({ success: false, message: 'No file in GridFS to reupload' });
+
+    const bucket = new GridFSBucket(mongoose.connection.db, { bucketName: 'upload' });
+    const fileId = new mongoose.Types.ObjectId(entry.file.filename);
+
+    const chunks = [];
+    const downloadStream = bucket.openDownloadStream(fileId);
+
+    await new Promise((resolve, reject) => {
+      downloadStream.on('data', chunk => chunks.push(chunk));
+      downloadStream.on('end', () => resolve());
+      downloadStream.on('error', err => reject(err));
+    });
+
+    const fileBuffer = Buffer.concat(chunks);
+    const tempPath = path.join(__dirname, '..', 'uploads', 'csv', `temp_${Date.now()}_${entry.sourceFile}`);
+    await fs.writeFile(tempPath, fileBuffer);
+
+    const uploadResult = await genai.files.upload({
+      file: tempPath,
+      config: {
+        mimeType: 'text/csv',
+        displayName: entry.sourceFile
+      }
+    });
+
+    entry.geminiFileUri = uploadResult.uri;
+    await workYear.save();
+    await fs.unlink(tempPath);
+
+    console.log(`✅ Gemini File API re-upload successful: ${uploadResult.uri}`);
+    res.status(200).json({ success: true, message: 'File reuploaded to Gemini', geminiFileUri: uploadResult.uri, workYear });
+  } catch (err) {
+    console.error('reuploadToGemini error', err);
     res.status(500).json({ success: false, message: 'Internal server error', error: err.message });
   }
 };
