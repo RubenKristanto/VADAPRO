@@ -1,29 +1,34 @@
 import { useState } from 'react';
-import axios from 'axios'; // <-- Added missing import
+import { authService } from './services/authentication.js';
 import './LoginPage.css';
 
-function LoginPage() {
+function LoginPage({ onLoginSuccess }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [message, setMessage] = useState(''); // <-- Renamed state for consistency
+  const [errorType, setErrorType] = useState(''); // Track error type for styling
 
   const handleRegister = async (e) => {
     e.preventDefault();
     if (!username || !password) {
       setMessage('Please enter both username and password');
+      setErrorType('validation');
       return;
     }
-    setIsLoading(true); // <-- Fixed function name
-    setMessage(''); // Clear previous messages
+    setIsLoading(true);
+    setMessage('');
+    setErrorType('');
     try {
-      const res = await axios.post('http://localhost:3001/auth/register', { username, password });
-      setMessage(res.data.message);
+      const result = await authService.register({ username, password });
+      setMessage(result.message);
+      setErrorType('success');
     } catch (err) {
-      setMessage(err.response?.data?.message || 'Registration failed');
+      setMessage(err.message || 'Registration failed');
+      setErrorType(err.errorType || 'error');
     } finally {
-      setIsLoading(false); // <-- Fixed function name
+      setIsLoading(false);
     }
   };
 
@@ -31,22 +36,35 @@ function LoginPage() {
     e.preventDefault();
     if (!username || !password) {
       setMessage('Please enter both username and password');
+      setErrorType('validation');
       return;
     }
-    setIsLoading(true); // <-- Fixed function name
-    setMessage(''); // Clear previous messages
+    setIsLoading(true);
+    setMessage('');
+    setErrorType('');
     try {
-      const res = await axios.post('http://localhost:3001/auth/login', { username, password });
-      setMessage(res.data.message);
-      // You can handle token/user here if needed
+      const result = await authService.login({ username, password });
+      
+      // If login is successful, call the success callback immediately
+      if (result && result.token) {
+        console.log(`Logged in - Username: ${result.user.username}, ID: ${result.user.id || result.user._id}`);
+        // Small delay to show success message before transition
+        setTimeout(() => {
+          if (onLoginSuccess) {
+            onLoginSuccess(result.user);
+          }
+        }, 500);
+      }
+      
     } catch (err) {
-      setMessage(err.response?.data?.message || 'Login failed');
+      console.error('Login error:', err);
+      setMessage(err.message || 'Login failed');
+      setErrorType(err.errorType || 'error');
     } finally {
-      setIsLoading(false); // <-- Fixed function name
+      setIsLoading(false);
     }
   };
 
-  // The return statement must be inside the component function
   return (
     <div className="login-container">
       <header className="login-header">
@@ -55,7 +73,7 @@ function LoginPage() {
       <div className="login-content">
         <div className="login-rectangle">
           <h2>Welcome Back</h2>
-          <form onSubmit={handleLogin} autoComplete="off">
+          <form autoComplete="off">
             <div className="input-group">
               <label htmlFor="username">Username</label>
               <input
@@ -103,10 +121,15 @@ function LoginPage() {
             </div>
             
             {/* Area to display feedback messages to the user */}
-            {message && <p className="login-message">{message}</p>}
+            {message && (
+              <p className={`login-message ${errorType === 'success' ? 'success' : 'error'}`}>
+                {message}
+              </p>
+            )}
 
             <button
-              type="submit"
+              type="button"
+              onClick={handleLogin}
               className="login-button"
               disabled={isLoading || !username || !password}
             >
@@ -124,11 +147,10 @@ function LoginPage() {
             </button>
             
           </form>
-          <p className="create-account-link"> Don't have an account? <a href="/register">Create account</a> </p>
         </div>
       </div>
     </div>
   );
-} // <-- Correctly placed closing brace
+}
 
 export default LoginPage;

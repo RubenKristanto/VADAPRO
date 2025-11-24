@@ -7,12 +7,13 @@ npm install express
 This backend is built with Node.js, Express, and MongoDB (using Mongoose). It provides user authentication (register and login) with secure password hashing.
 
 ## Technologies Used
-- Node.js
+- Node.js (version 22.21.1 via nvm)
 - Express
 - MongoDB (with Mongoose)
 - bcryptjs (for password hashing)
 - dotenv (for environment variables)
 - body-parser, cors
+- @google/genai
 
 ## Project Structure
 
@@ -44,9 +45,9 @@ vadapro_backend/
 	```
 
 3. **Create .env file**
-	Add your MongoDB connection string:
+	Add your MongoDB connection string to be able to connect to atlas (use the legacy string, not srv):
 	```
-	MONGO_URI=mongodb://localhost:27017/vadapro
+	mongodb://<username>:<password>@ac-v2w2wd3-shard-00-00.630jtbb.mongodb.net:27017,ac-v2w2wd3-shard-00-01.630jtbb.mongodb.net:27017,ac-v2w2wd3-shard-00-02.630jtbb.mongodb.net:27017/VADAPRO_Data?ssl=true&replicaSet=atlas-a1tlum-shard-0&authSource=admin&retryWrites=true&w=majority&appName=Vadapro
 	PORT=3001
 	```
 
