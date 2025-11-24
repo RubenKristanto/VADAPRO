@@ -1,10 +1,15 @@
 import { useState, useEffect } from 'react';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import './ProcessPage.css';
 import processService from './services/processService';
 import aiService from './services/aiService';
+import { authService } from './services/authentication';
+import workYearService from './services/workYearService';
+import programService from './services/programService';
 import * as dfd from 'danfojs';
 import Papa from 'papaparse';
-import DynamicChart from './components/DynamicChart';
+import ChartGenerator from './components/ChartGenerator';
+import ComparisonChart from './components/ComparisonChart';
 
 // Backend interface: GET /file/gridfs/:entryId returns CSV file from MongoDB GridFS
 
@@ -34,21 +39,26 @@ const kurt = (series) => {
   return values.reduce((a, b) => a + Math.pow((b - mean) / std, 4), 0) / n - 3;
 };
 
-function ProcessPage({ entry, program, year, onBack, onLogout, organization }) {
+function ProcessPage({ onLogout }) {
+  const { organizationId, programId, year, entryId } = useParams();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [entry, setEntry] = useState(location.state?.entry || null);
+  const [program, setProgram] = useState(location.state?.program || null);
+  const [organization, setOrganization] = useState(location.state?.organization || null);
+  const currentUser = authService.getCurrentUser();
   const [processId, setProcessId] = useState(null);
   const [processStatus, setProcessStatus] = useState('ready');
   const [progress, setProgress] = useState(0);
   const [logs, setLogs] = useState([]);
-  const [imageUrl, setImageUrl] = useState(null);
+  const [chartConfigs, setChartConfigs] = useState([]);
   const [initError, setInitError] = useState(null);
   const [csvData, setCsvData] = useState(null); // DataFrame from CSV
   const [rawCsvText, setRawCsvText] = useState(null); // Raw CSV text for AI analysis
   
   // Handler to clear current process and go back
   const handleBack = () => {
-    // Don't clear the process ID - keep it for when user returns
-    // localStorage.removeItem('currentProcessId');
-    if (onBack) onBack();
+    navigate(`/organizations/${organizationId}/programs/${programId}/year/${year}/data`);
   };
   
   // Statistical parameters state
@@ -63,6 +73,20 @@ function ProcessPage({ entry, program, year, onBack, onLogout, organization }) {
   const [userInput, setUserInput] = useState('');
   const [isAiTyping, setIsAiTyping] = useState(false);
   const [modelName, setModelName] = useState('AI');
+  
+  // Comparison state
+  const [comparisons, setComparisons] = useState([]);
+  const [currentComparisonIndex, setCurrentComparisonIndex] = useState(0);
+  const [showComparisonModal, setShowComparisonModal] = useState(false);
+  const [availableWorkYears, setAvailableWorkYears] = useState([]);
+  const [selectedCurrentQuestion, setSelectedCurrentQuestion] = useState('');
+  const [selectedTargetYear, setSelectedTargetYear] = useState('');
+  const [selectedTargetEntry, setSelectedTargetEntry] = useState('');
+  const [selectedTargetQuestion, setSelectedTargetQuestion] = useState('');
+  const [targetEntries, setTargetEntries] = useState([]);
+  const [targetQuestions, setTargetQuestions] = useState([]);
+  // New state for multiple work year selections
+  const [selectedWorkYearEntries, setSelectedWorkYearEntries] = useState([]);
   
   // Comprehensive list of statistical parameters available in danfo.js
   // Organized by category for better UX
@@ -174,9 +198,36 @@ function ProcessPage({ entry, program, year, onBack, onLogout, organization }) {
     }]);
   }, []);
 
-  // ============================================
-  // INITIALIZE PROCESS AND FETCH DATA FROM BACKEND
-  // ============================================
+  useEffect(() => {
+    const loadEntry = async () => {
+      if (!entry && entryId && programId) {
+        try {
+          const resp = await programService.getOrganizationPrograms(organizationId);
+          if (resp.success) {
+            const prog = resp.programs.find(p => p._id === programId);
+            if (prog) {
+              setProgram(prog);
+              const wyResp = await workYearService.getProgramWorkYears(programId);
+              if (wyResp.success) {
+                const wy = wyResp.workYears.find(w => w.year === parseInt(year, 10));
+                if (wy) {
+                  const wyDetail = await workYearService.getWorkYearById(wy._id);
+                  if (wyDetail.success) {
+                    const foundEntry = wyDetail.workYear.entries?.find(e => e._id === entryId);
+                    if (foundEntry) setEntry(foundEntry);
+                  }
+                }
+              }
+            }
+          }
+        } catch (error) {
+          console.error('Failed to load entry', error);
+        }
+      }
+    };
+    loadEntry();
+  }, [entryId, entry, programId, organizationId, year]);
+
   useEffect(() => {
     const initializeProcess = async () => {
       try {
@@ -205,8 +256,12 @@ function ProcessPage({ entry, program, year, onBack, onLogout, organization }) {
                 setLogs(process.logs.map(log => log.message));
               }
               
-              if (process.imageUrl) {
-                setImageUrl(process.imageUrl);
+              if (process.chartConfigs && process.chartConfigs.length > 0) {
+                setChartConfigs(process.chartConfigs);
+              }
+              
+              if (process.compareChartConfigs && process.compareChartConfigs.length > 0) {
+                setComparisons(process.compareChartConfigs);
               }
               
               if (process.chatMessages && process.chatMessages.length > 0) {
@@ -462,9 +517,8 @@ function ProcessPage({ entry, program, year, onBack, onLogout, organization }) {
     return getAllStats().find(stat => stat.id === statId);
   };
 
-  // ============================================
-  // GEMINI API INTEGRATION
-  // ============================================
+  
+  // gemini API integration
   const sendMessageToGemini = async (message) => {
     try {
       const context = {
@@ -481,6 +535,7 @@ function ProcessPage({ entry, program, year, onBack, onLogout, organization }) {
         sourceFileName: entry?.sourceFile,
         processId: processId,
         entryId: entry?._id || entry?.id,
+        geminiFileUri: entry?.geminiFileUri,
         responseCount: entry?.responseCount,
         programName: program?.name,
         organizationName: organization?.name,
@@ -515,9 +570,7 @@ function ProcessPage({ entry, program, year, onBack, onLogout, organization }) {
       return '❌ Unable to connect to AI service. Please check your connection and try again.';
     }
   };
-  // ============================================
-  // END OF GEMINI API INTEGRATION
-  // ============================================
+  // end of gemini API integration
 
   // Handle sending a chat message
   const handleSendMessage = async () => {
@@ -681,6 +734,257 @@ function ProcessPage({ entry, program, year, onBack, onLogout, organization }) {
     }, 800);
   };
 
+  // Comparison feature functions
+  const checkHasMean = (process) => {
+    return process?.selectedStats?.some(stat => stat.statId === 'mean') || false;
+  };
+
+  const getNumericQuestions = () => {
+    if (!csvData) return [];
+    return csvData.columns.filter(col => 
+      csvData[col].dtype === 'float32' || csvData[col].dtype === 'int32'
+    );
+  };
+
+  const openComparisonModal = async () => {
+    try {
+      const wyResponse = await workYearService.getProgramWorkYears(programId);
+      if (wyResponse.success) {
+        const filteredWY = wyResponse.workYears.filter(wy => wy.year !== year);
+        setAvailableWorkYears(filteredWY);
+        setShowComparisonModal(true);
+      }
+    } catch (error) {
+      console.error('Error loading work years:', error);
+    }
+  };
+
+  const handleAddWorkYearEntry = async () => {
+    if (!selectedTargetYear || !selectedTargetEntry || !selectedTargetQuestion) return;
+    
+    // Check if this entry is already added
+    const alreadyExists = selectedWorkYearEntries.some(
+      item => item.entryId === selectedTargetEntry && item.year === selectedTargetYear
+    );
+    
+    if (alreadyExists) {
+      alert('This work year entry has already been added.');
+      return;
+    }
+    
+    try {
+      const targetProcesses = await processService.getAllProcesses();
+      const targetProcess = targetProcesses.processes?.find(p => p.entry === selectedTargetEntry);
+      
+      if (!targetProcess || !checkHasMean(targetProcess)) {
+        alert('Target entry does not have mean calculated');
+        return;
+      }
+      
+      const targetStat = targetProcess.selectedStats.find(s => s.statId === 'mean');
+      
+      let targetMean;
+      if (targetStat?.calculatedValues) {
+        const calcValues = targetStat.calculatedValues;
+        targetMean = calcValues[selectedTargetQuestion] || 
+                     calcValues.get?.(selectedTargetQuestion) ||
+                     calcValues['default'] || 
+                     calcValues.get?.('default');
+      }
+      
+      if (!targetMean) {
+        alert('Mean value not found for selected question');
+        return;
+      }
+      
+      const newEntry = {
+        year: parseInt(selectedTargetYear),
+        entryId: String(selectedTargetEntry),
+        entryName: targetEntries.find(e => e._id === selectedTargetEntry)?.name || 'Unknown',
+        question: selectedTargetQuestion,
+        meanValue: parseFloat(targetMean)
+      };
+      
+      setSelectedWorkYearEntries(prev => [...prev, newEntry]);
+      
+      // Reset selection fields for next entry
+      setSelectedTargetYear('');
+      setSelectedTargetEntry('');
+      setSelectedTargetQuestion('');
+      setTargetEntries([]);
+      setTargetQuestions([]);
+    } catch (error) {
+      console.error('Error adding work year entry:', error);
+      alert('Error adding work year entry');
+    }
+  };
+  
+  const handleRemoveWorkYearEntry = (index) => {
+    setSelectedWorkYearEntries(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleTargetYearChange = async (selectedYear) => {
+    setSelectedTargetYear(selectedYear);
+    setSelectedTargetEntry('');
+    setSelectedTargetQuestion('');
+    setTargetEntries([]);
+    setTargetQuestions([]);
+    
+    // Convert selectedYear to number for comparison (comes as string from dropdown)
+    const yearNum = Number(selectedYear);
+    const wy = availableWorkYears.find(w => w.year === yearNum);
+    console.log('=== TARGET YEAR CHANGE ===');
+    console.log('Selected year:', selectedYear, 'Type:', typeof selectedYear);
+    console.log('Converted to number:', yearNum);
+    console.log('Available work years:', availableWorkYears.map(w => ({ year: w.year, type: typeof w.year })));
+    console.log('Found WorkYear:', wy);
+    if (!wy) return;
+    
+    try {
+      const wyDetail = await workYearService.getWorkYearById(wy._id);
+      console.log('WorkYear details:', wyDetail);
+      
+      if (wyDetail.success && wyDetail.workYear.entries) {
+        console.log('Entries in WorkYear:', wyDetail.workYear.entries.length);
+        
+        // Fetch all processes once, outside the loop for efficiency
+        const entryProcesses = await processService.getAllProcesses();
+        console.log('Total processes in system:', entryProcesses.processes?.length);
+        console.log('All process entry IDs:', entryProcesses.processes?.map(p => ({ id: p._id, entry: p.entry, hasStats: p.selectedStats?.length > 0 })));
+        
+        const entriesWithMean = [];
+        for (const ent of wyDetail.workYear.entries) {
+          try {
+            console.log('\n--- Checking Entry ---');
+            console.log('Entry name:', ent.name);
+            console.log('Entry ID:', ent._id);
+            console.log('Entry ID type:', typeof ent._id);
+            
+            // Convert both IDs to strings for comparison to handle ObjectId vs string mismatch
+            const matchingProcess = entryProcesses.processes?.find(p => {
+              const match = String(p.entry) === String(ent._id);
+              if (match) {
+                console.log('MATCH FOUND! Process ID:', p._id, 'Entry:', p.entry);
+              }
+              return match;
+            });
+            
+            console.log('Found matching process:', matchingProcess ? 'YES' : 'NO');
+            if (matchingProcess) {
+              console.log('Process selectedStats array:', matchingProcess.selectedStats);
+              console.log('selectedStats length:', matchingProcess.selectedStats?.length);
+              const hasMean = checkHasMean(matchingProcess);
+              console.log('Has mean stat:', hasMean);
+              
+              if (hasMean) {
+                entriesWithMean.push(ent);
+                console.log('✓ Entry added to list');
+              } else {
+                console.log('✗ Entry skipped - no mean stat');
+              }
+            } else {
+              console.log('✗ No matching process found for this entry');
+            }
+          } catch (err) {
+            console.error('Error checking entry process:', err);
+          }
+        }
+        
+        console.log('\n=== FINAL RESULT ===');
+        console.log('Total entries with mean:', entriesWithMean.length);
+        console.log('Entries:', entriesWithMean.map(e => e.name));
+        setTargetEntries(entriesWithMean);
+      }
+    } catch (error) {
+      console.error('Error loading target entries:', error);
+    }
+  };
+
+  const handleTargetEntryChange = async (entryId) => {
+    setSelectedTargetEntry(entryId);
+    setSelectedTargetQuestion('');
+    
+    try {
+      const csvUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/file/gridfs/${entryId}`;
+      const df = await dfd.readCSV(csvUrl);
+      const numCols = df.columns.filter(col => df[col].dtype === 'float32' || df[col].dtype === 'int32');
+      setTargetQuestions(numCols);
+    } catch (error) {
+      console.error('Error loading target questions:', error);
+    }
+  };
+
+  const handleAddComparison = async () => {
+    if (!selectedCurrentQuestion || selectedWorkYearEntries.length === 0) {
+      alert('Please select a question and add at least one work year entry to compare.');
+      return;
+    }
+    
+    try {
+      const currentMean = statisticsData[`${selectedCurrentQuestion}|mean`] || statisticsData['mean'];
+      
+      if (!currentMean) {
+        alert('Mean value not found for the current question');
+        return;
+      }
+      
+      // Build entries array with current entry and all selected work year entries
+      const entries = [
+        { year: parseInt(year), entryId: String(entry._id || entry.id), entryName: entry.name, meanValue: parseFloat(currentMean) },
+        ...selectedWorkYearEntries.map(item => ({
+          year: parseInt(item.year),
+          entryId: String(item.entryId),
+          entryName: item.entryName,
+          meanValue: parseFloat(item.meanValue)
+        }))
+      ].sort((a, b) => a.year - b.year);
+      
+      const newComparison = {
+        id: Date.now(),
+        question: selectedCurrentQuestion,
+        entries: entries
+      };
+      
+      const updatedComparisons = [...comparisons, newComparison];
+      setComparisons(updatedComparisons);
+      if (processId) {
+        processService.updateCompareChartConfigs(processId, updatedComparisons).catch(err => console.error('Error saving comparisons:', err));
+      }
+      setCurrentComparisonIndex(comparisons.length);
+      setShowComparisonModal(false);
+      resetComparisonModal();
+    } catch (error) {
+      console.error('Error adding comparison:', error);
+      alert('Error adding comparison');
+    }
+  };
+
+  const resetComparisonModal = () => {
+    setSelectedCurrentQuestion('');
+    setSelectedTargetYear('');
+    setSelectedTargetEntry('');
+    setSelectedTargetQuestion('');
+    setTargetEntries([]);
+    setTargetQuestions([]);
+    setSelectedWorkYearEntries([]);
+  };
+
+  const deleteComparison = (idx) => {
+    const updatedComparisons = comparisons.filter((_, i) => i !== idx);
+    setComparisons(updatedComparisons);
+    if (processId) {
+      processService.updateCompareChartConfigs(processId, updatedComparisons).catch(err => console.error('Error saving comparisons:', err));
+    }
+    setCurrentComparisonIndex(prev => Math.max(0, Math.min(prev, updatedComparisons.length - 1)));
+  };
+
+  const navigateComparison = (direction) => {
+    setCurrentComparisonIndex(prev => {
+      if (direction === 'left') return Math.max(0, prev - 1);
+      return Math.min(comparisons.length - 1, prev + 1);
+    });
+  };
+
   const resetProcess = async () => {
     setProcessStatus('ready');
     setProgress(0);
@@ -711,9 +1015,10 @@ function ProcessPage({ entry, program, year, onBack, onLogout, organization }) {
               ← Back to Data
             </button>
             {onLogout && (
-              <button onClick={onLogout} className="logout-btn">
-                Logout
-              </button>
+              <div style={{display:'flex',alignItems:'center',gap:'10px'}}>
+                <button onClick={onLogout} className="logout-btn">Logout</button>
+                <span style={{fontSize:'20px',color:'#f0f0f0'}}>{currentUser?.username}</span>
+              </div>
             )}
           </div>
         </div>
@@ -738,26 +1043,12 @@ function ProcessPage({ entry, program, year, onBack, onLogout, organization }) {
             {/* UPPER BODY SECTION - Image Placeholder */}
             <div className="upper-body-section">
               <div className="image-placeholder">
-                {imageUrl ? (
-                  <img 
-                    src={imageUrl} 
-                    alt="Process visualization" 
-                    className="process-image"
-                  />
-                ) : processId ? (
-                  // Render DynamicChart when a process exists. The component will fetch CSV via processService.getCsvData(processId).
-                  <div style={{ width: '100%', height: '100%' }}>
-                      <DynamicChart processId={processId} entryId={entry?._id || entry?.id} style={{ width: '100%', height: '100%' }} />
-                  </div>
-                ) : (
-                  <div className="placeholder-content">
-                    <div className="placeholder-icon">🖼️</div>
-                    <p className="placeholder-text">Image Placeholder</p>
-                    <p className="placeholder-subtext">
-                      Image will be loaded from backend
-                    </p>
-                  </div>
-                )}
+                <ChartGenerator 
+                  entryId={entry?._id || entry?.id} 
+                  processId={processId}
+                  initialCharts={chartConfigs}
+                  onChartsChange={setChartConfigs}
+                />
               </div>
             </div>
 
@@ -973,8 +1264,215 @@ function ProcessPage({ entry, program, year, onBack, onLogout, organization }) {
               </div>
             </div>
           </div>
+
+          {/* BOTTOM SECTION - Comparison Charts */}
+          <div className="bottom-section" style={{ marginTop: '20px', padding: '50px', background: '#f9f9f9', borderRadius: '12px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0px' }}>
+              <h3 style={{ margin: 0 }}>📊 Data Comparisons</h3>
+              <button
+                onClick={openComparisonModal}
+                disabled={!checkHasMean({ selectedStats: selectedStats.map(s => ({ statId: s })) }) || getNumericQuestions().length === 0}
+                style={{
+                  padding: '10px 20px',
+                  background: checkHasMean({ selectedStats: selectedStats.map(s => ({ statId: s })) }) && getNumericQuestions().length > 0 ? '#4CAF50' : '#ddd',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: checkHasMean({ selectedStats: selectedStats.map(s => ({ statId: s })) }) && getNumericQuestions().length > 0 ? 'pointer' : 'not-allowed',
+                  fontSize: '14px',
+                  fontWeight: 'bold'
+                }}
+              >
+                + Add Comparison
+              </button>
+            </div>
+            {comparisons.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '40px', color: '#666' }}>
+                <div style={{ fontSize: '48px', marginBottom: '10px' }}>📈</div>
+                <p>No comparisons yet. Click "Add Comparison" to compare data across work years.</p>
+                {!checkHasMean({ selectedStats: selectedStats.map(s => ({ statId: s })) }) && (
+                  <p style={{ color: '#f44336', fontSize: '14px' }}>Note: You must add "Mean" statistic before creating comparisons.</p>
+                )}
+              </div>
+            ) : (
+              <ComparisonChart
+                comparisons={comparisons}
+                currentIndex={currentComparisonIndex}
+                onNavigate={navigateComparison}
+                onDelete={deleteComparison}
+              />
+            )}
+          </div>
         </div>
       </div>
+
+      {/* Comparison Selection Modal */}
+      {showComparisonModal && (
+        <div className="stats-modal-overlay" onClick={() => { setShowComparisonModal(false); resetComparisonModal(); }}>
+          <div className="stats-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '600px' }}>
+            <div className="stats-modal-header">
+              <h2>📊 Add Data Comparison</h2>
+              <button className="modal-close-btn" onClick={() => { setShowComparisonModal(false); resetComparisonModal(); }}>×</button>
+            </div>
+            
+            <div className="stats-modal-body" style={{ padding: '20px' }}>
+              <div style={{ marginBottom: '20px' }}>
+                <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>
+                  Select Question from Current Entry ({year}):
+                </label>
+                <select
+                  value={selectedCurrentQuestion}
+                  onChange={(e) => setSelectedCurrentQuestion(e.target.value)}
+                  style={{ width: '100%', padding: '10px', fontSize: '14px', borderRadius: '6px', border: '1px solid #ddd' }}
+                >
+                  <option value="">-- Choose a question --</option>
+                  {getNumericQuestions().map(q => <option key={q} value={q}>{q}</option>)}
+                </select>
+              </div>
+
+              <div style={{ marginBottom: '20px', padding: '15px', background: '#f5f5f5', borderRadius: '8px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                  <label style={{ fontWeight: 'bold', fontSize: '16px', color: 'black' }}>Add Work Years to Compare:</label>
+                  {selectedWorkYearEntries.length > 0 && (
+                    <span style={{ fontSize: '14px', color: '#666' }}>({selectedWorkYearEntries.length} selected)</span>
+                  )}
+                </div>
+                
+                <div style={{ marginBottom: '15px' }}>
+                  <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold', fontSize: '14px', color: 'black' }}>
+                    Select Work Year:
+                  </label>
+                  <select
+                    value={selectedTargetYear}
+                    onChange={(e) => handleTargetYearChange(e.target.value)}
+                    style={{ width: '100%', padding: '10px', fontSize: '14px', borderRadius: '6px', border: '1px solid #ddd' }}
+                  >
+                    <option value="">-- Choose a work year --</option>
+                    {availableWorkYears.map(wy => <option key={wy._id} value={wy.year}>{wy.year}</option>)}
+                  </select>
+                </div>
+
+                {selectedTargetYear && (
+                  <div style={{ marginBottom: '15px' }}>
+                    <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold', fontSize: '14px', color: 'black' }}>
+                      Select Entry from {selectedTargetYear}:
+                    </label>
+                    <select
+                      value={selectedTargetEntry}
+                      onChange={(e) => handleTargetEntryChange(e.target.value)}
+                      style={{ width: '100%', padding: '10px', fontSize: '14px', borderRadius: '6px', border: '1px solid #ddd' }}
+                    >
+                      <option value="">-- Choose an entry --</option>
+                      {targetEntries.map(ent => <option key={ent._id} value={ent._id}>{ent.name}</option>)}
+                    </select>
+                    {targetEntries.length === 0 && <p style={{ fontSize: '12px', color: '#f44336', marginTop: '5px' }}>No entries with mean values found</p>}
+                  </div>
+                )}
+
+                {selectedTargetEntry && (
+                  <div style={{ marginBottom: '15px' }}>
+                    <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold', fontSize: '14px', color: 'black' }}>
+                      Select Question from Target Entry:
+                    </label>
+                    <select
+                      value={selectedTargetQuestion}
+                      onChange={(e) => setSelectedTargetQuestion(e.target.value)}
+                      style={{ width: '100%', padding: '10px', fontSize: '14px', borderRadius: '6px', border: '1px solid #ddd' }}
+                    >
+                      <option value="">-- Choose a question --</option>
+                      {targetQuestions.map(q => <option key={q} value={q}>{q}</option>)}
+                    </select>
+                  </div>
+                )}
+
+                <button
+                  onClick={handleAddWorkYearEntry}
+                  disabled={!selectedTargetYear || !selectedTargetEntry || !selectedTargetQuestion}
+                  style={{
+                    width: '100%',
+                    padding: '10px',
+                    background: (!selectedTargetYear || !selectedTargetEntry || !selectedTargetQuestion) ? '#ddd' : '#4CAF50',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    cursor: (!selectedTargetYear || !selectedTargetEntry || !selectedTargetQuestion) ? 'not-allowed' : 'pointer',
+                    fontSize: '14px',
+                    fontWeight: 'bold'
+                  }}
+                >
+                  + Add This Entry
+                </button>
+              </div>
+
+              {selectedWorkYearEntries.length > 0 && (
+                <div style={{ marginBottom: '20px' }}>
+                  <label style={{ display: 'block', marginBottom: '10px', fontWeight: 'bold' }}>
+                    Selected Work Year Entries:
+                  </label>
+                  <div style={{ maxHeight: '200px', overflowY: 'auto', border: '1px solid #ddd', borderRadius: '6px', background: 'white' }}>
+                    {selectedWorkYearEntries.map((item, index) => (
+                      <div
+                        key={index}
+                        style={{
+                          padding: '12px',
+                          borderBottom: index < selectedWorkYearEntries.length - 1 ? '1px solid #eee' : 'none',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center'
+                        }}
+                      >
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>
+                            {item.year} - {item.entryName}
+                          </div>
+                          <div style={{ fontSize: '12px', color: '#666' }}>
+                            Question: {item.question}
+                          </div>
+                          <div style={{ fontSize: '12px', color: '#666' }}>
+                            Mean: {item.meanValue.toFixed(2)}
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => handleRemoveWorkYearEntry(index)}
+                          style={{
+                            padding: '6px 10px',
+                            background: '#f44336',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                            fontSize: '12px',
+                            fontWeight: 'bold'
+                          }}
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="stats-modal-footer">
+              <button className="modal-btn secondary" onClick={() => { setShowComparisonModal(false); resetComparisonModal(); }}>
+                Cancel
+              </button>
+              <button
+                className="modal-btn primary"
+                onClick={handleAddComparison}
+                disabled={!selectedCurrentQuestion || selectedWorkYearEntries.length === 0}
+                style={{
+                  opacity: (!selectedCurrentQuestion || selectedWorkYearEntries.length === 0) ? 0.5 : 1,
+                  cursor: (!selectedCurrentQuestion || selectedWorkYearEntries.length === 0) ? 'not-allowed' : 'pointer'
+                }}
+              >
+                Create Comparison ({selectedWorkYearEntries.length} {selectedWorkYearEntries.length === 1 ? 'entry' : 'entries'})
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Statistics Selection Modal */}
       {showStatsModal && (

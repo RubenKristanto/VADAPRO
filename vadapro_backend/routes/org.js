@@ -1,6 +1,7 @@
-const express = require('express');
+import express from 'express';
+import * as orgController from '../controllers/orgController.js';
+
 const router = express.Router();
-const orgController = require('../controllers/orgController');
 
 // Organization CRUD routes
 router.post('/create', orgController.createOrganization);
@@ -10,4 +11,4 @@ router.get('/:id', orgController.getOrganizationById);
 router.put('/:id', orgController.editOrganization);
 router.delete('/:id', orgController.deleteOrganization);
 
-module.exports = router;
+export default router;

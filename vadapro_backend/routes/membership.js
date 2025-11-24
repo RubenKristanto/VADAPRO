@@ -1,6 +1,7 @@
-const express = require('express');
+import express from 'express';
+import * as membershipController from '../controllers/membershipController.js';
+
 const router = express.Router();
-const membershipController = require('../controllers/membershipController');
 
 // Invite user to organization
 router.post('/invite', membershipController.inviteUser);
@@ -17,4 +18,4 @@ router.get('/organization/:organizationId', membershipController.getOrganization
 // Get user's role in organization
 router.get('/role/:organizationId/:username', membershipController.getUserRole);
 
-module.exports = router;
+export default router;

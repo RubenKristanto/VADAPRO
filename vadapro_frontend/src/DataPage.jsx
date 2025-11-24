@@ -1,30 +1,56 @@
 import { useState, useEffect, useRef } from 'react';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import './DataPage.css';
 import workYearService from './services/workYearService';
+import { authService } from './services/authentication';
+import programService from './services/programService';
 import * as dfd from 'danfojs';
 
-function DataPage({ program, year, onBack, onLogout, onNavigateToProcess }) {
+function DataPage({ onLogout }) {
+  const { organizationId, programId, year } = useParams();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [program, setProgram] = useState(location.state?.program || null);
+  const [organization, setOrganization] = useState(location.state?.organization || null);
+  const currentUser = authService.getCurrentUser();
   const [entries, setEntries] = useState([]);
   const [expandedEntries, setExpandedEntries] = useState(new Set());
   const [showAddModal, setShowAddModal] = useState(false);
   const [newEntryName, setNewEntryName] = useState('');
   const [workYearData, setWorkYearData] = useState(null);
-  // file inputs removed - uploads are handled per-entry via the entry upload button
   
-  // Delete confirmation states
+  const [pendingFiles, setPendingFiles] = useState({});
+  
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [entryToDelete, setEntryToDelete] = useState(null);
   const [deleteConfirmName, setDeleteConfirmName] = useState('');
   const [confirmationStep, setConfirmationStep] = useState('name');
   
-  // Process confirmation states
   const [showProcessModal, setShowProcessModal] = useState(false);
   const [entryToProcess, setEntryToProcess] = useState(null);
+  const [isUploading, setIsUploading] = useState(false);
 
   const openAddModal = () => {
     setShowAddModal(true);
     setNewEntryName('');
   };
+
+  useEffect(() => {
+    const loadProgram = async () => {
+      if (!program && programId) {
+        try {
+          const resp = await programService.getOrganizationPrograms(organizationId);
+          if (resp.success) {
+            const prog = resp.programs.find(p => p._id === programId);
+            if (prog) setProgram(prog);
+          }
+        } catch (error) {
+          console.error('Failed to load program', error);
+        }
+      }
+    };
+    loadProgram();
+  }, [programId, program, organizationId]);
 
   useEffect(() => {
     const loadWorkYear = async () => {
@@ -50,7 +76,7 @@ function DataPage({ program, year, onBack, onLogout, onNavigateToProcess }) {
       }
     };
     loadWorkYear();
-  }, [program, year]);
+  }, [program, year, programId]);
 
   const closeAddModal = () => {
     setShowAddModal(false);
@@ -65,6 +91,7 @@ function DataPage({ program, year, onBack, onLogout, onNavigateToProcess }) {
       name: e.name,
       sourceFile: e.sourceFile || null,
       responseCount: e.responseCount || 0,
+      geminiFileUri: e.geminiFileUri || null,
       persisted: true
     }));
   };
@@ -141,13 +168,20 @@ function DataPage({ program, year, onBack, onLogout, onNavigateToProcess }) {
 
   const finalDelete = async () => {
     try {
-      if (workYearData && workYearData._id && entryToDelete.id) {
-        await workYearService.deleteEntry(workYearData._id, entryToDelete.id);
+      const entryIdToDelete = entryToDelete.id;
+      if (workYearData && workYearData._id && entryIdToDelete) {
+        await workYearService.deleteEntry(workYearData._id, entryIdToDelete);
         const single = await workYearService.getWorkYearById(workYearData._id);
         if (single && single.success) setEntries(mapEntriesFromWorkYear(single.workYear));
       } else {
-        setEntries(entries.filter(entry => entry.id !== entryToDelete.id));
+        setEntries(entries.filter(entry => entry.id !== entryIdToDelete));
       }
+      
+      setPendingFiles(prev => {
+        const updated = { ...prev };
+        delete updated[entryIdToDelete];
+        return updated;
+      });
     } catch (err) {
       console.error('Delete entry error', err);
       alert('Failed to delete entry');
@@ -155,47 +189,36 @@ function DataPage({ program, year, onBack, onLogout, onNavigateToProcess }) {
     cancelDelete();
   };
 
-  const handleFileUpload = (entryId, e) => {
+  const handleFileSelect = (entryId, e) => {
     e.stopPropagation();
     const file = e.target.files[0];
     if (!file) return;
 
     (async () => {
       try {
-        const df = await dfd.readCSV(file); // Count rows from uploaded CSV
-        if (workYearData && workYearData._id) {
-          const resp = await workYearService.uploadDatasheets(workYearData._id, entryId, [file]);
-          if (resp && resp.success) {
-            // Refresh from server
-            const single = await workYearService.getWorkYearById(workYearData._id);
-            if (single && single.success) {
-              setWorkYearData(single.workYear);
-              const mappedEntries = mapEntriesFromWorkYear(single.workYear);
-              const updatedEntries = mappedEntries.map(entry => 
-                entry.id === entryId ? { ...entry, responseCount: df.shape[0] } : entry
-              );
-              setEntries(updatedEntries);
-            }
-            return;
+        const df = await dfd.readCSV(file);
+        const responseCount = df.shape[0];
+        
+        setPendingFiles(prev => ({
+          ...prev,
+          [entryId]: { file, responseCount }
+        }));
+        
+        const updatedEntries = entries.map(entry => {
+          if (entry.id === entryId) {
+            return {
+              ...entry,
+              sourceFile: file.name,
+              responseCount: responseCount,
+              geminiFileUri: null
+            };
           }
-          alert(resp.message || 'Upload failed');
-        } else {
-          // No workYear selected: update locally (offline mode)
-          const updatedEntries = entries.map(entry => {
-            if (entry.id === entryId) {
-              return {
-                ...entry,
-                sourceFile: file.name,
-                responseCount: df.shape[0]
-              };
-            }
-            return entry;
-          });
-          setEntries(updatedEntries);
-        }
+          return entry;
+        });
+        setEntries(updatedEntries);
       } catch (err) {
-        console.error('File upload error', err);
-        alert('Upload failed — check console for details');
+        console.error('File selection error', err);
+        alert('Failed to read file — check console for details');
       }
     })();
   };
@@ -213,11 +236,81 @@ function DataPage({ program, year, onBack, onLogout, onNavigateToProcess }) {
     setEntryToProcess(null);
   };
 
-  const startProcess = () => {
-    if (onNavigateToProcess) {
-      onNavigateToProcess(entryToProcess);
+  const startProcess = async () => {
+    const entryId = entryToProcess.id;
+    const pendingFile = pendingFiles[entryId];
+    
+    if (pendingFile && workYearData && workYearData._id) {
+      setIsUploading(true);
+      try {
+        const resp = await workYearService.uploadDatasheets(workYearData._id, entryId, [pendingFile.file]);
+        if (resp && resp.success) {
+          const single = await workYearService.getWorkYearById(workYearData._id);
+          if (single && single.success) {
+            setWorkYearData(single.workYear);
+            const updatedEntry = single.workYear.entries.find(e => e._id === entryId);
+            
+            setPendingFiles(prev => {
+              const updated = { ...prev };
+              delete updated[entryId];
+              return updated;
+            });
+            
+            navigate(`/organizations/${organizationId}/programs/${programId}/year/${year}/data/${entryId}/process`, {
+              state: { entry: updatedEntry, program, year, organization }
+            });
+            closeProcessModal();
+          } else {
+            alert('Failed to refresh entry data');
+          }
+        } else {
+          alert(resp.message || 'Upload failed');
+        }
+      } catch (err) {
+        console.error('File upload error', err);
+        alert('Upload failed — check console for details');
+      } finally {
+        setIsUploading(false);
+      }
+    } else {
+      if (entryToProcess.geminiFileUri && workYearData && workYearData._id) {
+        setIsUploading(true);
+        try {
+          const validationResp = await workYearService.validateGeminiUri(workYearData._id, entryId);
+          
+          if (!validationResp.valid) {
+            const reuploadResp = await workYearService.reuploadToGemini(workYearData._id, entryId);
+            if (reuploadResp && reuploadResp.success) {
+              const single = await workYearService.getWorkYearById(workYearData._id);
+              if (single && single.success) {
+                const updatedEntry = single.workYear.entries.find(e => e._id === entryId);
+                navigate(`/organizations/${organizationId}/programs/${programId}/year/${year}/data/${entryId}/process`, {
+                  state: { entry: updatedEntry, program, year, organization }
+                });
+                closeProcessModal();
+              }
+            } else {
+              alert('Failed to reupload file to Gemini');
+            }
+          } else {
+            navigate(`/organizations/${organizationId}/programs/${programId}/year/${year}/data/${entryId}/process`, {
+              state: { entry: entryToProcess, program, year, organization }
+            });
+            closeProcessModal();
+          }
+        } catch (err) {
+          console.error('Gemini validation error', err);
+          alert('Failed to validate file — check console for details');
+        } finally {
+          setIsUploading(false);
+        }
+      } else {
+        navigate(`/organizations/${organizationId}/programs/${programId}/year/${year}/data/${entryId}/process`, {
+          state: { entry: entryToProcess, program, year, organization }
+        });
+        closeProcessModal();
+      }
     }
-    closeProcessModal();
   };
 
   return (
@@ -226,13 +319,14 @@ function DataPage({ program, year, onBack, onLogout, onNavigateToProcess }) {
         <div className="header-content">
           <h1>VADAPRO <span className="subtitle">Data - {program?.name} ({year})</span></h1>
           <div className="header-actions">
-            <button onClick={onBack} className="back-btn">
+            <button onClick={() => navigate(`/organizations/${organizationId}/programs`)} className="back-btn">
               ← Back to Programs
             </button>
             {onLogout && (
-              <button onClick={onLogout} className="logout-btn">
-                Logout
-              </button>
+              <div style={{display:'flex',alignItems:'center',gap:'10px'}}>
+                <button onClick={onLogout} className="logout-btn">Logout</button>
+                <span style={{fontSize:'20px',color:'#f0f0f0'}}>{currentUser?.username}</span>
+              </div>
             )}
           </div>
         </div>
@@ -284,12 +378,13 @@ function DataPage({ program, year, onBack, onLogout, onNavigateToProcess }) {
                             <span className="info-label">Source:</span>
                             <span className="source-filename">
                               {entry.sourceFile || 'No file uploaded'}
+                              {pendingFiles[entry.id] && <span style={{color: '#ffa500', marginLeft: '8px'}}>(pending upload)</span>}
                             </span>
                             {!entry.sourceFile && (
                               <label className="upload-btn-wrapper">
                                 <input
                                   type="file"
-                                  onChange={(e) => handleFileUpload(entry.id, e)}
+                                  onChange={(e) => handleFileSelect(entry.id, e)}
                                   style={{ display: 'none' }}
                                   accept=".csv,.xlsx,.xls"
                                 />
@@ -427,17 +522,25 @@ function DataPage({ program, year, onBack, onLogout, onNavigateToProcess }) {
             <p className="modal-description">
               You are about to process "<strong>{entryToProcess?.name}</strong>".
               <br />
+              {pendingFiles[entryToProcess?.id] && (
+                <>
+                  <br />
+                  The file will be uploaded before processing begins.
+                  <br />
+                </>
+              )}
               Click "Start Process" to continue to the processing page.
             </p>
             <div className="modal-actions">
-              <button onClick={closeProcessModal} className="modal-cancel-btn">
+              <button onClick={closeProcessModal} className="modal-cancel-btn" disabled={isUploading}>
                 Cancel
               </button>
               <button 
                 onClick={startProcess} 
                 className="modal-confirm-btn modal-process-btn"
+                disabled={isUploading}
               >
-                Start Process
+                {isUploading ? 'Uploading...' : 'Start Process'}
               </button>
             </div>
           </div>

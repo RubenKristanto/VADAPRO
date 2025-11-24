@@ -1,14 +1,14 @@
-const Program = require('../models/programModel');
-const Organization = require('../models/organizationModel');
-const User = require('../models/userModel');
-const Membership = require('../models/membershipModel');
-const WorkYear = require('../models/workYearModel');
-const Process = require('../models/processModel');
-const mongoose = require('mongoose');
-const { GridFSBucket } = require('mongodb');
+import Program from '../models/programModel.js';
+import Organization from '../models/organizationModel.js';
+import User from '../models/userModel.js';
+import Membership from '../models/membershipModel.js';
+import WorkYear from '../models/workYearModel.js';
+import Process from '../models/processModel.js';
+import mongoose from 'mongoose';
+import { GridFSBucket } from 'mongodb';
 
 // Create a new program
-exports.createProgram = async (req, res) => {
+export const createProgram = async (req, res) => {
     try {
         const { name, description, organizationId, startDate, endDate } = req.body;
 
@@ -75,7 +75,7 @@ exports.createProgram = async (req, res) => {
 };
 
 // Get all programs for an organization
-exports.getOrganizationPrograms = async (req, res) => {
+export const getOrganizationPrograms = async (req, res) => {
     try {
         const { organizationId } = req.params;
 
@@ -106,7 +106,7 @@ exports.getOrganizationPrograms = async (req, res) => {
 };
 
 // Get single program by ID
-exports.getProgramById = async (req, res) => {
+export const getProgramById = async (req, res) => {
     try {
         const { id } = req.params;
 
@@ -143,7 +143,7 @@ exports.getProgramById = async (req, res) => {
 };
 
 // Edit program
-exports.editProgram = async (req, res) => {
+export const editProgram = async (req, res) => {
     try {
         const { id } = req.params;
         const { name, description, editorUsername, startDate, endDate, status } = req.body;
@@ -222,7 +222,7 @@ exports.editProgram = async (req, res) => {
 };
 
 // Delete program
-exports.deleteProgram = async (req, res) => {
+export const deleteProgram = async (req, res) => {
     try {
         const { id } = req.params;
         const { deleterUsername } = req.body;

@@ -1,11 +1,11 @@
-const Process = require('../models/processModel');
-const Program = require('../models/programModel');
-const Organization = require('../models/organizationModel');
-const User = require('../models/userModel');
-const mongoose = require('mongoose');
+import Process from '../models/processModel.js';
+import Program from '../models/programModel.js';
+import Organization from '../models/organizationModel.js';
+import User from '../models/userModel.js';
+import mongoose from 'mongoose';
 
 // Create a new process
-exports.createProcess = async (req, res) => {
+export const createProcess = async (req, res) => {
     try {
         const {
             name,
@@ -67,7 +67,7 @@ exports.createProcess = async (req, res) => {
 };
 
 // Get all processes
-exports.getAllProcesses = async (req, res) => {
+export const getAllProcesses = async (req, res) => {
     try {
         const processes = await Process.find()
             .sort({ createdAt: -1 });
@@ -89,7 +89,7 @@ exports.getAllProcesses = async (req, res) => {
 };
 
 // Get process by ID
-exports.getProcessById = async (req, res) => {
+export const getProcessById = async (req, res) => {
     try {
         const { id } = req.params;
 
@@ -125,7 +125,7 @@ exports.getProcessById = async (req, res) => {
 };
 
 // Update process
-exports.updateProcess = async (req, res) => {
+export const updateProcess = async (req, res) => {
     try {
         const { id } = req.params;
         const updateData = req.body;
@@ -148,7 +148,7 @@ exports.updateProcess = async (req, res) => {
         // Update allowed fields
         const allowedUpdates = [
             'name', 'sourceFileName', 'responseCount', 'rawData', 'processedData',
-            'imageUrl', 'imageStoragePath', 'processStatus', 'progress',
+            'chartConfigs', 'compareChartConfigs', 'processStatus', 'progress',
             'year', 'tags', 'danfoConfig', 'processingConfig',
             'errorMessage', 'errorStack'
         ];
@@ -181,7 +181,7 @@ exports.updateProcess = async (req, res) => {
 };
 
 // Delete process
-exports.deleteProcess = async (req, res) => {
+export const deleteProcess = async (req, res) => {
     try {
         const { id } = req.params;
 
@@ -217,7 +217,7 @@ exports.deleteProcess = async (req, res) => {
 };
 
 // Add a chat message
-exports.addChatMessage = async (req, res) => {
+export const addChatMessage = async (req, res) => {
     try {
         const { id } = req.params;
         const { type, content, isError } = req.body;
@@ -285,7 +285,7 @@ exports.addChatMessage = async (req, res) => {
 };
 
 // Clear chat history
-exports.clearChatHistory = async (req, res) => {
+export const clearChatHistory = async (req, res) => {
     try {
         const { id } = req.params;
 
@@ -329,7 +329,7 @@ exports.clearChatHistory = async (req, res) => {
 };
 
 // Add a selected statistic
-exports.addSelectedStat = async (req, res) => {
+export const addSelectedStat = async (req, res) => {
     try {
         const { id } = req.params;
         const { statId, label, icon, category, categoryLabel } = req.body;
@@ -400,7 +400,7 @@ exports.addSelectedStat = async (req, res) => {
 };
 
 // Remove a selected statistic
-exports.removeSelectedStat = async (req, res) => {
+export const removeSelectedStat = async (req, res) => {
     try {
         const { id, statId } = req.params;
 
@@ -440,7 +440,7 @@ exports.removeSelectedStat = async (req, res) => {
 };
 
 // Update statistic value
-exports.updateStatValue = async (req, res) => {
+export const updateStatValue = async (req, res) => {
     try {
         const { id, statId } = req.params;
         const { value } = req.body;
@@ -495,7 +495,7 @@ exports.updateStatValue = async (req, res) => {
 };
 
 // Update progress
-exports.updateProgress = async (req, res) => {
+export const updateProgress = async (req, res) => {
     try {
         const { id } = req.params;
         const { progress, logMessage } = req.body;
@@ -558,7 +558,7 @@ exports.updateProgress = async (req, res) => {
 };
 
 // Update process status
-exports.updateProcessStatus = async (req, res) => {
+export const updateProcessStatus = async (req, res) => {
     try {
         const { id } = req.params;
         const { status } = req.body;

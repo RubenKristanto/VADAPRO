@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import './OrganizationPage.css';
 import organizationService from './services/organizationService';
 import MemberManagement from './components/MemberManagement';
 import { isUserAdmin } from './services/membershipService';
 
-function OrganizationsPage({ onLogout, onOrganizationSelect, currentUser }) {
+function OrganizationsPage({ onLogout, currentUser }) {
+  const navigate = useNavigate();
   const [organizations, setOrganizations] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [newOrgName, setNewOrgName] = useState('');
@@ -196,9 +198,7 @@ function OrganizationsPage({ onLogout, onOrganizationSelect, currentUser }) {
 
   const handleOrganizationClick = (org) => {
     console.log(`Accessing Organization - Name: ${org.name}, ID: ${org._id || org.id}`);
-    if (onOrganizationSelect) {
-      onOrganizationSelect(org);
-    }
+    navigate(`/organizations/${org._id}/programs`, { state: { organization: org } });
   };
 
   const clearMessages = () => {
@@ -221,9 +221,10 @@ function OrganizationsPage({ onLogout, onOrganizationSelect, currentUser }) {
       <header className="organizations-header">
         <h1>VADAPRO <span className="subtitle">Organizations</span></h1>
         {onLogout && (
-          <button onClick={onLogout} className="logout-btn">
-            Logout
-          </button>
+          <div style={{display:'flex',alignItems:'center',gap:'10px'}}>
+            <button onClick={onLogout} className="logout-btn">Logout</button>
+            <span style={{fontSize:'20px',color:'#f0f0f0'}}>{currentUser?.username}</span>
+          </div>
         )}
       </header>
       

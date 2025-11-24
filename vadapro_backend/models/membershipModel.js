@@ -1,4 +1,4 @@
-const mongoose = require('mongoose');
+import mongoose from 'mongoose';
 
 const membershipSchema = new mongoose.Schema({
     user: {
@@ -69,4 +69,4 @@ membershipSchema.statics.countAdmins = async function(organizationId) {
     });
 };
 
-module.exports = mongoose.model('Membership', membershipSchema);
+export default mongoose.model('Membership', membershipSchema);

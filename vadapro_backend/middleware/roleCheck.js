@@ -1,6 +1,6 @@
-const Membership = require('../models/membershipModel');
-const User = require('../models/userModel');
-const mongoose = require('mongoose');
+import Membership from '../models/membershipModel.js';
+import User from '../models/userModel.js';
+import mongoose from 'mongoose';
 
 // Middleware to check if user is admin in organization
 const checkAdminRole = async (req, res, next) => {
@@ -128,7 +128,7 @@ const getUserRole = async (req, res, next) => {
     }
 };
 
-module.exports = {
+export {
     checkAdminRole,
     checkMemberRole,
     getUserRole

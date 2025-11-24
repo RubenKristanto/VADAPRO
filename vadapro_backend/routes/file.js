@@ -1,9 +1,10 @@
-const express = require('express');
+import express from 'express';
+import * as fileController from '../controllers/fileController.js';
+
 const router = express.Router();
-const fileController = require('../controllers/fileController');
 
 router.post('/upload', fileController.uploadCsv);
 router.get('/csv/:processId', fileController.getCsvUrl);
 router.get('/gridfs/:entryId', fileController.getCsvFromGridFS);
 
-module.exports = router;
+export default router;

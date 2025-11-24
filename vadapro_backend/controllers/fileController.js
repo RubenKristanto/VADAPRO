@@ -1,9 +1,13 @@
-const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
-const Process = require('../models/processModel');
-const mongoose = require('mongoose');
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
+import Process from '../models/processModel.js';
+import mongoose from 'mongoose';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 const uploadDir = path.join(__dirname, '../uploads/csv');
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
@@ -25,7 +29,7 @@ const upload = multer({
   }
 }).single('file');
 
-exports.uploadCsv = (req, res) => {
+export const uploadCsv = (req, res) => {
   upload(req, res, async (err) => {
     if (err) {
       return res.status(400).json({ success: false, message: err.message });
@@ -49,7 +53,7 @@ exports.uploadCsv = (req, res) => {
   });
 };
 
-exports.getCsvUrl = async (req, res) => {
+export const getCsvUrl = async (req, res) => {
   try {
     const process = await Process.findById(req.params.processId);
     if (!process || !process.csvUrl) {
@@ -62,7 +66,7 @@ exports.getCsvUrl = async (req, res) => {
 };
 
 // Serve CSV from GridFS by entry ID
-exports.getCsvFromGridFS = async (req, res) => {
+export const getCsvFromGridFS = async (req, res) => {
   try {
     const { entryId } = req.params;
     const bucket = new mongoose.mongo.GridFSBucket(mongoose.connection.db, { bucketName: 'upload' });

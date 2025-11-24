@@ -94,6 +94,24 @@ class WorkYearService {
     }
   }
 
+  async validateGeminiUri(workYearId, entryId) {
+    try {
+      const response = await axiosAPI.get(`/workyears/${workYearId}/entries/${entryId}/validate-gemini`);
+      return response.data;
+    } catch (error) {
+      return { success: false, valid: false };
+    }
+  }
+
+  async reuploadToGemini(workYearId, entryId) {
+    try {
+      const response = await axiosAPI.post(`/workyears/${workYearId}/entries/${entryId}/reupload-gemini`);
+      return response.data;
+    } catch (error) {
+      throw this.handleError(error);
+    }
+  }
+
   handleError(error) {
     if (error.response) {
       return { success: false, message: error.response.data.message || 'An error occurred', status: error.response.status, data: error.response.data };

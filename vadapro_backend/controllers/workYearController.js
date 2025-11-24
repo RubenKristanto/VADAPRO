@@ -1,13 +1,26 @@
-const WorkYear = require('../models/workYearModel');
-const Program = require('../models/programModel');
-const User = require('../models/userModel');
-const Membership = require('../models/membershipModel');
-const Process = require('../models/processModel');
-const mongoose = require('mongoose');
-const { GridFSBucket } = require('mongodb');
+import WorkYear from '../models/workYearModel.js';
+import Program from '../models/programModel.js';
+import User from '../models/userModel.js';
+import Membership from '../models/membershipModel.js';
+import Process from '../models/processModel.js';
+import mongoose from 'mongoose';
+import { GridFSBucket } from 'mongodb';
+import fs from 'fs/promises';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
+import { GoogleGenAI } from '@google/genai';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+// Initialize Gemini AI with API key
+const genai = new GoogleGenAI({ 
+  apiKey: process.env.GEMINI_API_KEY
+});
 
 // Create work year
-exports.createWorkYear = async (req, res) => {
+export const createWorkYear = async (req, res) => {
   try {
     const { programId, year } = req.body;
 
@@ -36,7 +49,7 @@ exports.createWorkYear = async (req, res) => {
 };
 
 // Get work years for a program
-exports.getProgramWorkYears = async (req, res) => {
+export const getProgramWorkYears = async (req, res) => {
   try {
     const { programId } = req.params;
     if (!mongoose.Types.ObjectId.isValid(programId)) return res.status(400).json({ success: false, message: 'Invalid programId' });
@@ -50,7 +63,7 @@ exports.getProgramWorkYears = async (req, res) => {
 };
 
 // Get single work year by id
-exports.getWorkYearById = async (req, res) => {
+export const getWorkYearById = async (req, res) => {
   try {
     const { id } = req.params;
     if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ success: false, message: 'Invalid id' });
@@ -66,7 +79,7 @@ exports.getWorkYearById = async (req, res) => {
 };
 
 // Create a data entry for a work year
-exports.createEntry = async (req, res) => {
+export const createEntry = async (req, res) => {
   try {
     const { id } = req.params; // workYear id
     const { name } = req.body;
@@ -91,7 +104,7 @@ exports.createEntry = async (req, res) => {
 };
 
 // Update entry sourceFile
-exports.updateEntry = async (req, res) => {
+export const updateEntry = async (req, res) => {
   try {
     const { id, entryId } = req.params;
     const { sourceFile } = req.body;
@@ -116,7 +129,7 @@ exports.updateEntry = async (req, res) => {
 };
 
 // Upload file to GridFS and attach to entry
-exports.uploadDatasheets = async (req, res) => {
+export const uploadDatasheets = async (req, res) => {
   try {
     const { id, entryId } = req.params;
     if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ success: false, message: 'Invalid workYear id' });
@@ -131,7 +144,7 @@ exports.uploadDatasheets = async (req, res) => {
     if (!req.files || req.files.length === 0) return res.status(400).json({ success: false, message: 'No files uploaded' });
 
     const bucket = new GridFSBucket(mongoose.connection.db, { bucketName: 'upload' });
-    const file = req.files[0]; // Take first file only
+    const file = req.files[0];
 
     const uploadStream = bucket.openUploadStream(file.originalname, {
       metadata: { workYearId: id, entryId: entryId, mimetype: file.mimetype, size: file.size }
@@ -150,9 +163,31 @@ exports.uploadDatasheets = async (req, res) => {
       size: file.size,
       url: `/api/workyears/files/${uploadStream.id}`
     };
-    
     entry.file = fileMeta;
     entry.sourceFile = file.originalname;
+    
+    try {
+      const tempPath = path.join(__dirname, '..', 'uploads', 'csv', `temp_${Date.now()}_${file.originalname}`);
+      await fs.writeFile(tempPath, file.buffer);
+
+      const uploadResult = await genai.files.upload({
+        file: tempPath,
+        config: {
+          mimeType: 'text/csv',
+          displayName: file.originalname
+        }
+      });
+      const fileName = uploadResult.name;
+
+      const fetchedFile = await genai.files.get({ name: fileName });
+      console.log(fetchedFile);
+
+      entry.geminiFileUri = uploadResult.uri;
+      await fs.unlink(tempPath);
+      console.log(`✅ Gemini File API upload successful: ${uploadResult.uri}`);
+    } catch (geminiErr) {
+      console.error('⚠️ Gemini File API upload failed:', geminiErr.message);
+    }
     
     await workYear.save();
     
@@ -164,7 +199,7 @@ exports.uploadDatasheets = async (req, res) => {
 };
 
 // Download file from GridFS
-exports.downloadFile = async (req, res) => {
+export const downloadFile = async (req, res) => {
   try {
     const { fileId } = req.params;
     const bucket = new GridFSBucket(mongoose.connection.db, { bucketName: 'upload' });
@@ -182,7 +217,7 @@ exports.downloadFile = async (req, res) => {
   }
 };
 
-exports.deleteWorkYear = async (req, res) => {
+export const deleteWorkYear = async (req, res) => {
   try {
     const { id } = req.params;
     const { deleterUsername } = req.body;
@@ -197,10 +232,20 @@ exports.deleteWorkYear = async (req, res) => {
     
     await Process.deleteMany({ entry: { $in: workYear.entries.map(e => e._id) } });
     
-    // Clean up GridFS files for this work year
     if (workYear.entries && workYear.entries.length > 0) {
       const bucket = new GridFSBucket(mongoose.connection.db, { bucketName: 'upload' });
       for (const entry of workYear.entries) {
+        if (entry.geminiFileUri) {
+          try {
+            const fileNameMatch = entry.geminiFileUri.match(/files\/([^\/]+)/);
+            if (fileNameMatch && fileNameMatch[1]) {
+              await genai.files.delete({ name: fileNameMatch[1] });
+              console.log(`✅ Gemini File API deletion successful: ${entry.geminiFileUri}`);
+            }
+          } catch (geminiErr) {
+            console.log(`❌ Gemini File API deletion failed: ${entry.geminiFileUri} - ${geminiErr.message}`);
+          }
+        }
         if (entry.file && entry.file.filename) {
           try {
             await bucket.delete(new mongoose.Types.ObjectId(entry.file.filename));
@@ -211,7 +256,6 @@ exports.deleteWorkYear = async (req, res) => {
       }
     }
     
-    // Delete the work year
     await WorkYear.findByIdAndDelete(id);
     res.status(200).json({ success: true, message: 'Work year deleted' });
   } catch (err) {
@@ -220,7 +264,7 @@ exports.deleteWorkYear = async (req, res) => {
   }
 };
 
-exports.deleteEntry = async (req, res) => {
+export const deleteEntry = async (req, res) => {
   try {
     const { id, entryId } = req.params;
     if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ success: false, message: 'Invalid workYear id' });
@@ -229,12 +273,25 @@ exports.deleteEntry = async (req, res) => {
     if (!workYear) return res.status(404).json({ success: false, message: 'Work year not found' });
     
     const entry = workYear.entries.id(entryId);
-    if (entry && entry.file && entry.file.filename) {
-      const bucket = new GridFSBucket(mongoose.connection.db, { bucketName: 'upload' });
-      try {
-        await bucket.delete(new mongoose.Types.ObjectId(entry.file.filename));
-      } catch (err) {
-        console.error('Error deleting file from GridFS:', err);
+    if (entry) {
+      if (entry.geminiFileUri) {
+        try {
+          const fileNameMatch = entry.geminiFileUri.match(/files\/([^\/]+)/);
+          if (fileNameMatch && fileNameMatch[1]) {
+            await genai.files.delete({ name: fileNameMatch[1] });
+            console.log(`✅ Gemini File API deletion successful: ${entry.geminiFileUri}`);
+          }
+        } catch (geminiErr) {
+          console.log(`❌ Gemini File API deletion failed: ${entry.geminiFileUri} - ${geminiErr.message}`);
+        }
+      }
+      if (entry.file && entry.file.filename) {
+        const bucket = new GridFSBucket(mongoose.connection.db, { bucketName: 'upload' });
+        try {
+          await bucket.delete(new mongoose.Types.ObjectId(entry.file.filename));
+        } catch (err) {
+          console.error('Error deleting file from GridFS:', err);
+        }
       }
     }
     
@@ -245,6 +302,92 @@ exports.deleteEntry = async (req, res) => {
     res.status(200).json({ success: true, message: 'Entry deleted', workYear });
   } catch (err) {
     console.error('deleteEntry error', err);
+    res.status(500).json({ success: false, message: 'Internal server error', error: err.message });
+  }
+};
+
+export const reuploadToGemini = async (req, res) => {
+  try {
+    const { id, entryId } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ success: false, message: 'Invalid workYear id' });
+    if (!mongoose.Types.ObjectId.isValid(entryId)) return res.status(400).json({ success: false, message: 'Invalid entry id' });
+
+    const workYear = await WorkYear.findById(id);
+    if (!workYear) return res.status(404).json({ success: false, message: 'Work year not found' });
+    
+    const entry = workYear.entries.id(entryId);
+    if (!entry) return res.status(404).json({ success: false, message: 'Entry not found' });
+    if (!entry.file || !entry.file.filename) return res.status(400).json({ success: false, message: 'No file in GridFS to reupload' });
+
+    const bucket = new GridFSBucket(mongoose.connection.db, { bucketName: 'upload' });
+    const fileId = new mongoose.Types.ObjectId(entry.file.filename);
+
+    const chunks = [];
+    const downloadStream = bucket.openDownloadStream(fileId);
+
+    await new Promise((resolve, reject) => {
+      downloadStream.on('data', chunk => chunks.push(chunk));
+      downloadStream.on('end', () => resolve());
+      downloadStream.on('error', err => reject(err));
+    });
+
+    const fileBuffer = Buffer.concat(chunks);
+    const tempPath = path.join(__dirname, '..', 'uploads', 'csv', `temp_${Date.now()}_${entry.sourceFile}`);
+    await fs.writeFile(tempPath, fileBuffer);
+
+    const uploadResult = await genai.files.upload({
+      file: tempPath,
+      config: {
+        mimeType: 'text/csv',
+        displayName: entry.sourceFile
+      }
+    });
+
+    entry.geminiFileUri = uploadResult.uri;
+    await workYear.save();
+    await fs.unlink(tempPath);
+
+    console.log(`✅ Gemini File API re-upload successful: ${uploadResult.uri}`);
+    res.status(200).json({ success: true, message: 'File reuploaded to Gemini', geminiFileUri: uploadResult.uri, workYear });
+  } catch (err) {
+    console.error('reuploadToGemini error', err);
+    res.status(500).json({ success: false, message: 'Internal server error', error: err.message });
+  }
+};
+
+export const validateGeminiUri = async (req, res) => {
+  try {
+    const { id, entryId } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ success: false, message: 'Invalid workYear id' });
+    if (!mongoose.Types.ObjectId.isValid(entryId)) return res.status(400).json({ success: false, message: 'Invalid entry id' });
+
+    const workYear = await WorkYear.findById(id);
+    if (!workYear) return res.status(404).json({ success: false, message: 'Work year not found' });
+    
+    const entry = workYear.entries.id(entryId);
+    if (!entry) return res.status(404).json({ success: false, message: 'Entry not found' });
+    if (!entry.geminiFileUri) return res.status(200).json({ success: true, valid: false, message: 'No Gemini URI found' });
+
+    try {
+      const fileNameMatch = entry.geminiFileUri.match(/files\/([^\/]+)/);
+      if (!fileNameMatch || !fileNameMatch[1]) {
+        return res.status(200).json({ success: true, valid: false, message: 'Invalid URI format' });
+      }
+
+      const existingFile = await genai.files.get({ name: fileNameMatch[1] });
+      if (existingFile && existingFile.state === 'ACTIVE') {
+        console.log(`✅ Gemini File API valid: ${entry.geminiFileUri}`);
+        return res.status(200).json({ success: true, valid: true, message: 'Gemini file is valid' });
+      } else {
+        console.log(`⚠️ Gemini File API not active: ${entry.geminiFileUri}`);
+        return res.status(200).json({ success: true, valid: false, message: 'Gemini file not active' });
+      }
+    } catch (checkErr) {
+      console.log(`⚠️ Gemini File API validation failed: ${checkErr.message}`);
+      return res.status(200).json({ success: true, valid: false, message: 'Gemini file check failed' });
+    }
+  } catch (err) {
+    console.error('validateGeminiUri error', err);
     res.status(500).json({ success: false, message: 'Internal server error', error: err.message });
   }
 };

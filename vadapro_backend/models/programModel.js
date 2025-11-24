@@ -1,4 +1,4 @@
-const mongoose = require('mongoose');
+import mongoose from 'mongoose';
 
 const programSchema = new mongoose.Schema({
     name: { 
@@ -40,4 +40,4 @@ const programSchema = new mongoose.Schema({
 programSchema.index({ organization: 1 });
 programSchema.index({ status: 1 });
 
-module.exports = mongoose.model('Program', programSchema, 'programs');
+export default mongoose.model('Program', programSchema, 'programs');
