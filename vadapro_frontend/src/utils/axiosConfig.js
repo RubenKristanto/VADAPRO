@@ -1,7 +1,8 @@
 import axios from 'axios';
 
 // Determine API base URL: prefer explicit VITE API env, otherwise default to production
-const API_BASE = import.meta.env.VITE_API_URL || 'https://vadapro-backend.vercel.app';
+// Use Vercel API format (serverless functions typically exposed under /api)
+const API_BASE = import.meta.env.VITE_API_URL || 'https://vadapro-backend.vercel.app/api';
 
 // Create axios instance with base configuration
 const axiosAPI = axios.create({
