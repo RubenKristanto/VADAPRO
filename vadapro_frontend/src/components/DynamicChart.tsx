@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import * as echarts from 'echarts';
 import processService from '../services/processService';
+import { API_BASE } from '../utils/axiosConfig';
 
 type Props = {
   processId: string | null;
@@ -92,7 +93,7 @@ const DynamicChart: React.FC<Props> = ({ processId, entryId, style }) => {
 
       // Fallback GridFS
       try {
-        const base = (import.meta as any).env?.VITE_API_URL || 'http://localhost:3001';
+        const base = API_BASE;
         const idToUse = entryId || processId;
         if (!idToUse) { setLoading(false); return; }
 

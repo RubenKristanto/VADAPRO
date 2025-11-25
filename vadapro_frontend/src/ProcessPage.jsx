@@ -10,6 +10,7 @@ import * as dfd from 'danfojs';
 import Papa from 'papaparse';
 import ChartGenerator from './components/ChartGenerator';
 import ComparisonChart from './components/ComparisonChart';
+import { API_BASE } from './utils/axiosConfig';
 
 // Backend interface: GET /file/gridfs/:entryId returns CSV file from MongoDB GridFS
 
@@ -324,7 +325,7 @@ function ProcessPage({ onLogout }) {
       if (!entry?._id && !entry?.id) return;
       try {
         const entryId = entry._id || entry.id;
-        const csvUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/file/gridfs/${entryId}`;
+        const csvUrl = `${API_BASE}/file/gridfs/${entryId}`;
         const df = await dfd.readCSV(csvUrl);
         setCsvData(df);
         entry.responseCount = df.shape[0]; // Update response count with actual CSV row count
@@ -343,7 +344,7 @@ function ProcessPage({ onLogout }) {
       if (!entry?._id && !entry?.id) return;
       try {
         const entryId = entry._id || entry.id;
-        const csvUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/file/gridfs/${entryId}`;
+        const csvUrl = `${API_BASE}/file/gridfs/${entryId}`;
         const response = await fetch(csvUrl);
         const text = await response.text();
         
@@ -905,7 +906,7 @@ function ProcessPage({ onLogout }) {
     setSelectedTargetQuestion('');
     
     try {
-      const csvUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/file/gridfs/${entryId}`;
+      const csvUrl = `${API_BASE}/file/gridfs/${entryId}`;
       const df = await dfd.readCSV(csvUrl);
       const numCols = df.columns.filter(col => df[col].dtype === 'float32' || df[col].dtype === 'int32');
       setTargetQuestions(numCols);
