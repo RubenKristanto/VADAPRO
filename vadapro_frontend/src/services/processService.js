@@ -189,7 +189,8 @@ class ProcessService {
   // Get CSV data URL - backend should return { success: true, csvUrl: 'url/to/csv' }
   async getCsvData(id) {
     try {
-      const response = await axiosAPI.get(`/process/${id}/csvdata`);
+      // backend exposes route under /file/csv/:processId
+      const response = await axiosAPI.get(`/file/csv/${id}`);
       return response.data;
     } catch (error) {
       throw this.handleError(error);

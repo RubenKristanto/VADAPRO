@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import * as echarts from 'echarts';
 import Papa from 'papaparse';
 import processService from '../services/processService';
+import { API_BASE } from '../utils/axiosConfig';
 import './ChartGenerator.css';
 
 const ChartGenerator = ({ entryId, processId, initialCharts = [], onChartsChange }) => {
@@ -37,7 +38,7 @@ const ChartGenerator = ({ entryId, processId, initialCharts = [], onChartsChange
     if (!entryId) return;
     const loadQuestions = async () => {
       try {
-        const csvUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/file/gridfs/${entryId}`;
+        const csvUrl = `${API_BASE}/file/gridfs/${entryId}`;
         const response = await fetch(csvUrl);
         const text = await response.text();
         const parsed = Papa.parse(text, { header: true, skipEmptyLines: true });
@@ -55,7 +56,7 @@ const ChartGenerator = ({ entryId, processId, initialCharts = [], onChartsChange
     if (!selectedQuestion || !entryId) return;
     
     try {
-      const csvUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/file/gridfs/${entryId}`;
+      const csvUrl = `${API_BASE}/file/gridfs/${entryId}`;
       const response = await fetch(csvUrl);
       const text = await response.text();
       const parsed = Papa.parse(text, { header: true, skipEmptyLines: true });
