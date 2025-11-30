@@ -2,7 +2,7 @@ import { GoogleGenAI, createUserContent, createPartFromUri } from '@google/genai
 
 const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
-const MODEL_NAME = 'gemini-2.5-flash';
+const MODEL_NAME = 'gemini-1.5-flash';
 
 const rateLimitStore = new Map();
 
@@ -136,7 +136,7 @@ const executeRequest = async ({ query, statistics, chartConfig, csvSummary, csvD
         model: MODEL_NAME,
         contents: createUserContent([
           createPartFromUri(geminiFileUri, 'text/csv'),
-          buildLightweightPrompt(query, sanitizedStats, context)
+          buildContextPrompt(query, sanitizedStats, chartConfig, sanitizedCsv, csvData, context)
         ])
       });
     } else {
@@ -144,7 +144,7 @@ const executeRequest = async ({ query, statistics, chartConfig, csvSummary, csvD
       result = await genAI.models.generateContent({
         model: MODEL_NAME,
         contents: createUserContent([
-          buildLightweightPrompt(query, sanitizedStats, context)
+          buildContextPrompt(query, sanitizedStats, chartConfig, sanitizedCsv, csvData, context)
         ])
       });
     }
@@ -233,26 +233,6 @@ export const analyzeData = async (req, res) => {
   }
 };
 
-const buildLightweightPrompt = (query, statistics, context) => {
-  const isSimple = query.length < 50 && /what|name|how many|which|when|where/i.test(query);
-  const maxWords = query.length < 30 ? 50 : query.length < 100 ? 150 : 300;
-  let prompt = `You are analyzing the CSV file that was uploaded. Answer this question concisely:\n\nQUERY: ${query}\n\n`;
-  if (context) {
-    prompt += `CONTEXT:\n`;
-    if (context.sourceFileName) prompt += `- File: ${context.sourceFileName}\n`;
-    if (context.entryName) prompt += `- Process: ${context.entryName}\n`;
-    if (context.responseCount) prompt += `- Responses: ${context.responseCount}\n`;
-    if (context.programName) prompt += `- Program: ${context.programName}\n`;
-    if (context.organizationName) prompt += `- Organization: ${context.organizationName}\n`;
-    if (context.year) prompt += `- Year: ${context.year}\n\n`;
-  }
-  if (statistics && Object.keys(statistics).length > 0) {
-    prompt += `STATISTICS:\n${JSON.stringify(statistics, null, 2)}\n\n`;
-  }
-  prompt += isSimple ? `Answer in 1-2 sentences. State only what was asked.\n\nYour response:` : `Provide focused analysis (max ${maxWords} words). Use bullets only for multiple points.\n\nYour response:`;
-  return prompt;
-};
-
 const buildContextPrompt = (query, statistics, chartConfig, csvSummary, csvData, context) => {
   const isSimple = query.length < 50 && /what|name|how many|which|when|where/i.test(query);
   const maxWords = query.length < 30 ? 50 : query.length < 100 ? 150 : 300;
@@ -268,8 +248,13 @@ const buildContextPrompt = (query, statistics, chartConfig, csvSummary, csvData,
     if (context.year) prompt += `- Year: ${context.year}\n\n`;
   }
   if (csvSummary) {
-    prompt += `DATA: ${csvSummary.totalRows} rows, ${csvSummary.totalColumns} columns\n`;
+    prompt += `DATA SUMMARY: ${csvSummary.totalRows} rows, ${csvSummary.totalColumns} columns\n`;
     if (csvSummary.columns) prompt += `Columns: ${csvSummary.columns.join(', ')}\n\n`;
+  }
+  if (csvData && Array.isArray(csvData) && csvData.length > 0) {
+    // Limit to first 20 rows to avoid token limits if using text-only
+    const sampleData = csvData.slice(0, 20);
+    prompt += `DATA SAMPLE (First ${sampleData.length} rows):\n${JSON.stringify(sampleData, null, 2)}\n\n`;
   }
   if (statistics && Object.keys(statistics).length > 0) {
     prompt += `STATISTICS:\n${JSON.stringify(statistics, null, 2)}\n\n`;
