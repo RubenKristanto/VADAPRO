@@ -5,7 +5,12 @@
   "type": "module",
   "main": "server.js",
   "scripts": {
+    "start": "node server.js",
+    "vercel-build": "echo \"no build step for backend\"",
     "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "engines": {
+    "node": "18.x"
   },
   "keywords": [],
   "author": "",
