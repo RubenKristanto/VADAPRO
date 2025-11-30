@@ -30,14 +30,14 @@ app.use(bodyParser.json());
 
 // Routes
 // Mount all API routes under the Vercel /api prefix so frontend can call '/api/...'
-app.use('api/auth', authRoutes);
-app.use('api/org', orgRoutes);
-app.use('api/programs', programRoutes);
-app.use('api/membership', membershipRoutes);
-app.use('api/process', processRoutes);
-app.use('api/workyears', workYearRoutes);
-app.use('api/file', fileRoutes);
-app.use('api/ai', aiRoutes);
+app.use('/api/auth', authRoutes);
+app.use('/api/org', orgRoutes);
+app.use('/api/programs', programRoutes);
+app.use('/api/membership', membershipRoutes);
+app.use('/api/process', processRoutes);
+app.use('/api/workyears', workYearRoutes);
+app.use('/api/file', fileRoutes);
+app.use('/api/ai', aiRoutes);
 
 // Serve uploaded files (Note: In Vercel, uploaded files are ephemeral and vanish. 
 // You should use S3/Cloudinary for file storage, but this line won't crash the app).
