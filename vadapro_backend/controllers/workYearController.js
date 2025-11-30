@@ -166,8 +166,20 @@ export const uploadDatasheets = async (req, res) => {
     entry.file = fileMeta;
     entry.sourceFile = file.originalname;
     
+import os from 'os';
+
+// ... existing imports ...
+
+// Upload file to GridFS and attach to entry
+export const uploadDatasheets = async (req, res) => {
+  try {
+    // ... existing validation ...
+    
+    // ... GridFS upload code ...
+    
     try {
-      const tempPath = path.join(__dirname, '..', 'uploads', 'csv', `temp_${Date.now()}_${file.originalname}`);
+      // FIX: Use os.tmpdir() for Vercel/Serverless compatibility
+      const tempPath = path.join(os.tmpdir(), `temp_${Date.now()}_${file.originalname}`);
       await fs.writeFile(tempPath, file.buffer);
 
       const uploadResult = await genai.files.upload({
@@ -177,6 +189,7 @@ export const uploadDatasheets = async (req, res) => {
           displayName: file.originalname
         }
       });
+      // ... rest of the code ...
       const fileName = uploadResult.name;
 
       const fetchedFile = await genai.files.get({ name: fileName });
@@ -332,7 +345,8 @@ export const reuploadToGemini = async (req, res) => {
     });
 
     const fileBuffer = Buffer.concat(chunks);
-    const tempPath = path.join(__dirname, '..', 'uploads', 'csv', `temp_${Date.now()}_${entry.sourceFile}`);
+    // FIX: Use os.tmpdir() for Vercel/Serverless compatibility
+    const tempPath = path.join(os.tmpdir(), `temp_${Date.now()}_${entry.sourceFile}`);
     await fs.writeFile(tempPath, fileBuffer);
 
     const uploadResult = await genai.files.upload({
