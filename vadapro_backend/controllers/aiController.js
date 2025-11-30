@@ -139,7 +139,20 @@ const executeRequest = async ({ query, statistics, chartConfig, csvSummary, csvD
           buildLightweightPrompt(query, sanitizedStats, context)
         ])
       });
+    } else {
+      console.log('Using Text-only API (no file URI provided)');
+      result = await genAI.models.generateContent({
+        model: MODEL_NAME,
+        contents: createUserContent([
+          buildLightweightPrompt(query, sanitizedStats, context)
+        ])
+      });
     }
+
+    if (!result) {
+      throw new Error('Failed to generate content from AI model');
+    }
+
     const text = result.text;
     const usageMetadata = result.usageMetadata || {};
     const inputTokens = usageMetadata.promptTokenCount || 0;
