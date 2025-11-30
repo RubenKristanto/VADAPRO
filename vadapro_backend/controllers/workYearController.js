@@ -7,6 +7,7 @@ import mongoose from 'mongoose';
 import { GridFSBucket } from 'mongodb';
 import fs from 'fs/promises';
 import path from 'path';
+import os from 'os';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import { GoogleGenAI } from '@google/genai';
@@ -166,19 +167,7 @@ export const uploadDatasheets = async (req, res) => {
     entry.file = fileMeta;
     entry.sourceFile = file.originalname;
     
-import os from 'os';
-
-// ... existing imports ...
-
-// Upload file to GridFS and attach to entry
-export const uploadDatasheets = async (req, res) => {
-  try {
-    // ... existing validation ...
-    
-    // ... GridFS upload code ...
-    
     try {
-      // FIX: Use os.tmpdir() for Vercel/Serverless compatibility
       const tempPath = path.join(os.tmpdir(), `temp_${Date.now()}_${file.originalname}`);
       await fs.writeFile(tempPath, file.buffer);
 
@@ -189,7 +178,6 @@ export const uploadDatasheets = async (req, res) => {
           displayName: file.originalname
         }
       });
-      // ... rest of the code ...
       const fileName = uploadResult.name;
 
       const fetchedFile = await genai.files.get({ name: fileName });
