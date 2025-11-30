@@ -28,6 +28,21 @@ const app = express();
 app.use(cors());
 app.use(bodyParser.json());
 
+// Database Connection Middleware
+// Ensures DB is connected before processing any request (fixes serverless cold/warm start issues)
+app.use(async (req, res, next) => {
+  if (mongoose.connection.readyState === 0) {
+    try {
+      await mongoose.connect(process.env.MONGO_URI);
+      console.log('MongoDB connected');
+    } catch (err) {
+      console.error('MongoDB connection error:', err);
+      return res.status(500).json({ error: 'Database connection failed' });
+    }
+  }
+  next();
+});
+
 // Routes
 // Mount all API routes under the Vercel /api prefix so frontend can call '/api/...'
 app.use('/api/auth', authRoutes);
@@ -47,22 +62,6 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.get('/', (req, res) => {
   res.send('VADAPRO API is running on Vercel!');
 });
-
-// Database Connection (Optimized for Serverless)
-// We check if we are already connected to avoid "cold start" delays
-const connectDB = async () => {
-  if (mongoose.connection.readyState === 0) {
-    try {
-      await mongoose.connect(process.env.MONGO_URI); // Make sure your Vercel Env Var is named 'MONGO_URI'
-      console.log('MongoDB connected');
-    } catch (err) {
-      console.error('MongoDB connection error:', err);
-    }
-  }
-};
-
-// Initialize DB connection
-connectDB();
 
 // !!! IMPORTANT FOR VERCEL !!!
 // Do NOT use app.listen(). Instead, export the app.
