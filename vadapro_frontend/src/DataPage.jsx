@@ -304,6 +304,38 @@ function DataPage({ onLogout }) {
         } finally {
           setIsUploading(false);
         }
+      } else if (entryToProcess.sourceFile && workYearData && workYearData._id) {
+        // Case 2b: Has sourceFile but NO geminiFileUri - attempt reupload
+        setIsUploading(true);
+        try {
+          const reuploadResp = await workYearService.reuploadToGemini(workYearData._id, entryId);
+          if (reuploadResp && reuploadResp.success) {
+            const single = await workYearService.getWorkYearById(workYearData._id);
+            if (single && single.success) {
+              const updatedEntry = single.workYear.entries.find(e => e._id === entryId);
+              navigate(`/organizations/${organizationId}/programs/${programId}/year/${year}/data/${entryId}/process`, {
+                state: { entry: updatedEntry, program, year, organization }
+              });
+              closeProcessModal();
+            }
+          } else {
+            // Reupload failed, proceed anyway (will use text-only AI)
+            console.warn('Gemini reupload failed, proceeding with text-only AI');
+            navigate(`/organizations/${organizationId}/programs/${programId}/year/${year}/data/${entryId}/process`, {
+              state: { entry: entryToProcess, program, year, organization }
+            });
+            closeProcessModal();
+          }
+        } catch (err) {
+          console.error('Gemini reupload error', err);
+          // Proceed anyway
+          navigate(`/organizations/${organizationId}/programs/${programId}/year/${year}/data/${entryId}/process`, {
+            state: { entry: entryToProcess, program, year, organization }
+          });
+          closeProcessModal();
+        } finally {
+          setIsUploading(false);
+        }
       } else {
         navigate(`/organizations/${organizationId}/programs/${programId}/year/${year}/data/${entryId}/process`, {
           state: { entry: entryToProcess, program, year, organization }
