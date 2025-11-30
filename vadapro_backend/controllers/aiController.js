@@ -139,6 +139,14 @@ const executeRequest = async ({ query, statistics, chartConfig, csvSummary, csvD
           buildLightweightPrompt(query, sanitizedStats, context)
         ])
       });
+    } else {
+      console.log('Gemini File URI missing. Using text-only mode.');
+      result = await genAI.models.generateContent({
+        model: MODEL_NAME,
+        contents: createUserContent([
+          buildContextPrompt(query, sanitizedStats, chartConfig, sanitizedCsv, csvData, context)
+        ])
+      });
     }
     const text = result.text;
     const usageMetadata = result.usageMetadata || {};
