@@ -212,15 +212,15 @@ function ProgramsPage({ onLogout, currentUser }) {
   return (
     <div className="programs-container">
       <header className="programs-header">
-        <div className="header-content">
-          <h1>VADAPRO <span className="subtitle">Programs - {organization?.name}</span></h1>
-          <div className="header-actions">
-            <button onClick={() => navigate('/organizations')} className="back-btn">
+        <div className="program-header-content">
+          <h1>VADAPRO <span className="program-subtitle">Programs - {organization?.name}</span></h1>
+          <div className="program-header-actions">
+            <button onClick={() => navigate('/organizations')} className="program-back-btn">
               ← Back to Organizations
             </button>
             {onLogout && (
               <div style={{display:'flex',alignItems:'center',gap:'10px'}}>
-                <button onClick={onLogout} className="logout-btn">Logout</button>
+                <button onClick={onLogout} className="program-logout-btn">Logout</button>
                 <span style={{fontSize:'20px',color:'#f0f0f0'}}>{currentUser?.username}</span>
               </div>
             )}
@@ -240,7 +240,7 @@ function ProgramsPage({ onLogout, currentUser }) {
                 onKeyDown={(e) => e.key === 'Enter' && createProgram()}
                 className="program-input"
               />
-              <button onClick={createProgram} className="create-btn">
+              <button onClick={createProgram} className="program-create-btn">
                 Create Program
               </button>
             </div>
@@ -257,7 +257,7 @@ function ProgramsPage({ onLogout, currentUser }) {
                             e.stopPropagation();
                             initiateDelete(program);
                           }}
-                          className="delete-btn"
+                          className="program-delete-btn"
                         >
                           ×
                         </button>
@@ -315,12 +315,12 @@ function ProgramsPage({ onLogout, currentUser }) {
 
       {/* Delete Confirmation Modal */}
       {showDeleteModal && (
-        <div className="modal-overlay" onClick={cancelDelete}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+        <div className="program-modal-overlay" onClick={cancelDelete}>
+          <div className="program-modal-content" onClick={(e) => e.stopPropagation()}>
             {confirmationStep === 'name' ? (
               <>
-                <h3 className="modal-title">Delete Program</h3>
-                <p className="modal-description">
+                <h3 className="program-modal-title">Delete Program</h3>
+                <p className="program-modal-description">
                   To confirm deletion of "<strong>{programToDelete?.name}</strong>", 
                   please type the program name below:
                 </p>
@@ -329,16 +329,16 @@ function ProgramsPage({ onLogout, currentUser }) {
                   placeholder="Type program name"
                   value={deleteConfirmName}
                   onChange={(e) => setDeleteConfirmName(e.target.value)}
-                  className="modal-input"
+                  className="program-modal-input"
                   autoFocus
                 />
-                <div className="modal-actions">
-                  <button onClick={cancelDelete} className="modal-cancel-btn">
+                <div className="program-modal-actions">
+                  <button onClick={cancelDelete} className="program-modal-cancel-btn">
                     Cancel
                   </button>
                   <button 
                     onClick={proceedToFinalConfirmation} 
-                    className="modal-confirm-btn"
+                    className="program-modal-confirm-btn"
                     disabled={deleteConfirmName !== programToDelete?.name}
                   >
                     Continue
@@ -347,19 +347,19 @@ function ProgramsPage({ onLogout, currentUser }) {
               </>
             ) : (
               <>
-                <h3 className="modal-title">Final Confirmation</h3>
-                <p className="modal-description">
+                <h3 className="program-modal-title">Final Confirmation</h3>
+                <p className="program-modal-description">
                   Are you sure you want to delete "<strong>{programToDelete?.name}</strong>"?
                   <br />
-                  <span className="warning-text">This action cannot be undone.</span>
+                  <span className="program-warning-text">This action cannot be undone.</span>
                 </p>
-                <div className="modal-actions">
-                  <button onClick={goBackToNameEntry} className="modal-cancel-btn">
+                <div className="program-modal-actions">
+                  <button onClick={goBackToNameEntry} className="program-modal-cancel-btn">
                     Go Back
                   </button>
                   <button 
                     onClick={finalDelete} 
-                    className="modal-confirm-btn"
+                    className="program-modal-confirm-btn"
                   >
                     Confirm Delete
                   </button>
@@ -372,10 +372,10 @@ function ProgramsPage({ onLogout, currentUser }) {
 
       {/* Add Year Modal */}
       {showYearModal && (
-        <div className="modal-overlay" onClick={closeYearModal}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <h3 className="modal-title">Add Year Instance</h3>
-            <p className="modal-description">
+        <div className="program-modal-overlay" onClick={closeYearModal}>
+          <div className="program-modal-content" onClick={(e) => e.stopPropagation()}>
+            <h3 className="program-modal-title">Add Year Instance</h3>
+            <p className="program-modal-description">
               Add a year instance for "<strong>{currentProgramForYear?.name}</strong>"
             </p>
             <input
@@ -384,17 +384,17 @@ function ProgramsPage({ onLogout, currentUser }) {
               value={newYear}
               onChange={(e) => setNewYear(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && addYear()}
-              className="modal-input"
+              className="program-modal-input"
               autoFocus
             />
             {yearError && <p style={{ color: 'red', fontSize: '0.85rem', marginTop: '0.5rem' }}>{yearError}</p>}
-            <div className="modal-actions">
-              <button onClick={closeYearModal} className="modal-cancel-btn">
+            <div className="program-modal-actions">
+              <button onClick={closeYearModal} className="program-modal-cancel-btn">
                 Cancel
               </button>
               <button 
                 onClick={addYear} 
-                className="modal-confirm-btn"
+                className="program-modal-confirm-btn"
                 disabled={!newYear.trim()}
               >
                 Add Year
@@ -406,10 +406,10 @@ function ProgramsPage({ onLogout, currentUser }) {
 
       {/* Delete Year Modal */}
       {showDeleteYearModal && (
-        <div className="modal-overlay" onClick={() => { setShowDeleteYearModal(false); setYearToDelete(null); setDeleteYearConfirm(''); }}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <h3 className="modal-title">Delete Year</h3>
-            <p className="modal-description">
+        <div className="program-modal-overlay" onClick={() => { setShowDeleteYearModal(false); setYearToDelete(null); setDeleteYearConfirm(''); }}>
+          <div className="program-modal-content" onClick={(e) => e.stopPropagation()}>
+            <h3 className="program-modal-title">Delete Year</h3>
+            <p className="program-modal-description">
               To confirm deletion, type "<strong>{yearToDelete?.programName}/{yearToDelete?.yearValue}</strong>":
             </p>
             <input
@@ -417,16 +417,16 @@ function ProgramsPage({ onLogout, currentUser }) {
               placeholder={`Type ${yearToDelete?.programName}/${yearToDelete?.yearValue}`}
               value={deleteYearConfirm}
               onChange={(e) => setDeleteYearConfirm(e.target.value)}
-              className="modal-input"
+              className="program-modal-input"
               autoFocus
             />
-            <div className="modal-actions">
-              <button onClick={() => { setShowDeleteYearModal(false); setYearToDelete(null); setDeleteYearConfirm(''); }} className="modal-cancel-btn">
+            <div className="program-modal-actions">
+              <button onClick={() => { setShowDeleteYearModal(false); setYearToDelete(null); setDeleteYearConfirm(''); }} className="program-modal-cancel-btn">
                 Cancel
               </button>
               <button 
                 onClick={confirmDeleteYear} 
-                className="modal-confirm-btn"
+                className="program-modal-confirm-btn"
                 disabled={deleteYearConfirm !== `${yearToDelete?.programName}/${yearToDelete?.yearValue}`}
               >
                 Delete

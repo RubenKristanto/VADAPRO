@@ -54,7 +54,7 @@
   padding-right: 2rem !important;
 }
 
-.header-content {
+.data-header-content {
   width: 100% !important;
   display: flex !important;
   justify-content: space-between !important;
@@ -71,7 +71,7 @@
   text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5) !important;
 }
 
-.data-header .subtitle {
+.data-header .data-subtitle {
   font-size: clamp(1rem, 2.5vw, 1.5rem) !important;
   font-weight: 400 !important;
   text-transform: lowercase !important;
@@ -80,13 +80,13 @@
   opacity: 0.8 !important;
 }
 
-.header-actions {
+.data-header-actions {
   display: flex !important;
   gap: 1rem !important;
   align-items: center !important;
 }
 
-.back-btn {
+.data-back-btn {
   background-color: #ffffff !important;
   color: #000000 !important;
   border: none !important;
@@ -100,18 +100,18 @@
   transition: all 0.3s ease !important;
 }
 
-.back-btn:hover {
+.data-back-btn:hover {
   background-color: #f3f4f6 !important;
   transform: translateY(-2px) !important;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
 }
 
-.back-btn:active {
+.data-back-btn:active {
   transform: translateY(0) !important;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2) !important;
 }
 
-.logout-btn {
+.data-logout-btn {
   background-color: #ffffff !important;
   color: #000000 !important;
   border: none !important;
@@ -126,13 +126,13 @@
   margin-left: auto !important;
 }
 
-.logout-btn:hover {
+.data-logout-btn:hover {
   background-color: #f3f4f6 !important;
   transform: translateY(-2px) !important;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
 }
 
-.logout-btn:active {
+.data-logout-btn:active {
   transform: translateY(0) !important;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2) !important;
 }
@@ -324,10 +324,10 @@
   padding: 1rem 1.25rem 1.25rem 1.25rem !important;
   border-top: 1px solid var(--border-color) !important;
   background: rgba(0, 0, 0, 0.01) !important;
-  animation: slideDown 0.3s ease-out !important;
+  animation: data-slideDown 0.3s ease-out !important;
 }
 
-@keyframes slideDown {
+@keyframes data-slideDown {
   from {
     opacity: 0;
     transform: translateY(-10px);
@@ -455,7 +455,7 @@
 }
 
 /* Modal styles - matching ProgramPage */
-.modal-overlay {
+.data-modal-overlay {
   position: fixed !important;
   top: 0 !important;
   left: 0 !important;
@@ -469,7 +469,7 @@
   backdrop-filter: blur(4px) !important;
 }
 
-.modal-content {
+.data-modal-content {
   background: white !important;
   border-radius: var(--fluid-border-radius) !important;
   padding: 2rem !important;
@@ -479,10 +479,10 @@
   box-shadow: 
     0 20px 25px -5px rgba(0, 0, 0, 0.1),
     0 10px 10px -5px rgba(0, 0, 0, 0.04) !important;
-  animation: modalSlideIn 0.3s ease-out !important;
+  animation: data-modalSlideIn 0.3s ease-out !important;
 }
 
-@keyframes modalSlideIn {
+@keyframes data-modalSlideIn {
   from {
     opacity: 0;
     transform: translateY(-20px) scale(0.95);
@@ -493,7 +493,7 @@
   }
 }
 
-.modal-title {
+.data-modal-title {
   font-size: 1.5rem !important;
   font-weight: 700 !important;
   color: var(--text-primary) !important;
@@ -501,7 +501,7 @@
   text-align: center !important;
 }
 
-.modal-description {
+.data-modal-description {
   color: var(--text-secondary) !important;
   font-size: 1rem !important;
   line-height: 1.5 !important;
@@ -509,13 +509,13 @@
   text-align: center !important;
 }
 
-.warning-text {
+.data-warning-text {
   color: var(--error-color) !important;
   font-weight: 600 !important;
   font-style: italic !important;
 }
 
-.modal-input {
+.data-modal-input {
   width: 100% !important;
   padding: 0.75rem 1rem !important;
   border: 2px solid var(--border-color) !important;
@@ -527,19 +527,19 @@
   margin-bottom: 1.5rem !important;
 }
 
-.modal-input:focus {
+.data-modal-input:focus {
   outline: none !important;
   border-color: var(--border-focus) !important;
   box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.1) !important;
 }
 
-.modal-actions {
+.data-modal-actions {
   display: flex !important;
   gap: 1rem !important;
   justify-content: flex-end !important;
 }
 
-.modal-cancel-btn {
+.data-modal-cancel-btn {
   padding: 0.75rem 1.5rem !important;
   background: #f3f4f6 !important;
   color: var(--text-secondary) !important;
@@ -551,12 +551,12 @@
   transition: all 0.3s ease !important;
 }
 
-.modal-cancel-btn:hover {
+.data-modal-cancel-btn:hover {
   background: #e5e7eb !important;
   border-color: var(--text-secondary) !important;
 }
 
-.modal-confirm-btn {
+.data-modal-confirm-btn {
   padding: 0.75rem 1.5rem !important;
   background: var(--error-color) !important;
   color: white !important;
@@ -568,13 +568,13 @@
   transition: all 0.3s ease !important;
 }
 
-.modal-confirm-btn:enabled:hover {
+.data-modal-confirm-btn:enabled:hover {
   background: #dc2626 !important;
   transform: translateY(-1px) !important;
   box-shadow: 0 4px 8px rgba(220, 38, 38, 0.3) !important;
 }
 
-.modal-confirm-btn:disabled {
+.data-modal-confirm-btn:disabled {
   background: #d1d5db !important;
   cursor: not-allowed !important;
   transform: none !important;
@@ -656,22 +656,22 @@
     font-size: 0.75rem !important;
   }
   
-  .modal-content {
+  .data-modal-content {
     padding: 1.5rem !important;
     margin: 0 0.5rem !important;
   }
   
-  .modal-title {
+  .data-modal-title {
     font-size: 1.25rem !important;
   }
   
-  .modal-actions {
+  .data-modal-actions {
     flex-direction: column !important;
     gap: 0.75rem !important;
   }
   
-  .modal-cancel-btn,
-  .modal-confirm-btn {
+  .data-modal-cancel-btn,
+  .data-modal-confirm-btn {
     width: 100% !important;
     padding: 0.875rem 1rem !important;
   }

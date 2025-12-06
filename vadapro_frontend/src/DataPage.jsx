@@ -348,15 +348,15 @@ function DataPage({ onLogout }) {
   return (
     <div className="data-container">
       <header className="data-header">
-        <div className="header-content">
-          <h1>VADAPRO <span className="subtitle">Data - {program?.name} ({year})</span></h1>
-          <div className="header-actions">
-            <button onClick={() => navigate(`/organizations/${organizationId}/programs`)} className="back-btn">
+        <div className="data-header-content">
+          <h1>VADAPRO <span className="data-subtitle">Data - {program?.name} ({year})</span></h1>
+          <div className="data-header-actions">
+            <button onClick={() => navigate(`/organizations/${organizationId}/programs`)} className="data-back-btn">
               ← Back to Programs
             </button>
             {onLogout && (
               <div style={{display:'flex',alignItems:'center',gap:'10px'}}>
-                <button onClick={onLogout} className="logout-btn">Logout</button>
+                <button onClick={onLogout} className="data-logout-btn">Logout</button>
                 <span style={{fontSize:'20px',color:'#f0f0f0'}}>{currentUser?.username}</span>
               </div>
             )}
@@ -458,10 +458,10 @@ function DataPage({ onLogout }) {
 
       {/* Add Entry Modal */}
       {showAddModal && (
-        <div className="modal-overlay" onClick={closeAddModal}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <h3 className="modal-title">Add Data Entry</h3>
-            <p className="modal-description">
+        <div className="data-modal-overlay" onClick={closeAddModal}>
+          <div className="data-modal-content" onClick={(e) => e.stopPropagation()}>
+            <h3 className="data-modal-title">Add Data Entry</h3>
+            <p className="data-modal-description">
               Create a new data entry for "<strong>{program?.name}</strong>" - {year}
             </p>
             <input
@@ -470,16 +470,16 @@ function DataPage({ onLogout }) {
               value={newEntryName}
               onChange={(e) => setNewEntryName(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && addEntry()}
-              className="modal-input"
+              className="data-modal-input"
               autoFocus
             />
-            <div className="modal-actions">
-              <button onClick={closeAddModal} className="modal-cancel-btn">
+            <div className="data-modal-actions">
+              <button onClick={closeAddModal} className="data-modal-cancel-btn">
                 Cancel
               </button>
               <button 
                 onClick={addEntry} 
-                className="modal-confirm-btn modal-add-btn"
+                className="data-modal-confirm-btn modal-add-btn"
                 disabled={!newEntryName.trim()}
               >
                 Add Entry
@@ -491,12 +491,12 @@ function DataPage({ onLogout }) {
 
       {/* Delete Confirmation Modal */}
       {showDeleteModal && (
-        <div className="modal-overlay" onClick={cancelDelete}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+        <div className="data-modal-overlay" onClick={cancelDelete}>
+          <div className="data-modal-content" onClick={(e) => e.stopPropagation()}>
             {confirmationStep === 'name' ? (
               <>
-                <h3 className="modal-title">Delete Entry</h3>
-                <p className="modal-description">
+                <h3 className="data-modal-title">Delete Entry</h3>
+                <p className="data-modal-description">
                   To confirm deletion of "<strong>{entryToDelete?.name}</strong>", 
                   please type the entry name below:
                 </p>
@@ -505,16 +505,16 @@ function DataPage({ onLogout }) {
                   placeholder="Type entry name"
                   value={deleteConfirmName}
                   onChange={(e) => setDeleteConfirmName(e.target.value)}
-                  className="modal-input"
+                  className="data-modal-input"
                   autoFocus
                 />
-                <div className="modal-actions">
-                  <button onClick={cancelDelete} className="modal-cancel-btn">
+                <div className="data-modal-actions">
+                  <button onClick={cancelDelete} className="data-modal-cancel-btn">
                     Cancel
                   </button>
                   <button 
                     onClick={proceedToFinalConfirmation} 
-                    className="modal-confirm-btn"
+                    className="data-modal-confirm-btn"
                     disabled={deleteConfirmName !== entryToDelete?.name}
                   >
                     Continue
@@ -523,19 +523,19 @@ function DataPage({ onLogout }) {
               </>
             ) : (
               <>
-                <h3 className="modal-title">Final Confirmation</h3>
-                <p className="modal-description">
+                <h3 className="data-modal-title">Final Confirmation</h3>
+                <p className="data-modal-description">
                   Are you sure you want to delete "<strong>{entryToDelete?.name}</strong>"?
                   <br />
-                  <span className="warning-text">This action cannot be undone.</span>
+                  <span className="data-warning-text">This action cannot be undone.</span>
                 </p>
-                <div className="modal-actions">
-                  <button onClick={goBackToNameEntry} className="modal-cancel-btn">
+                <div className="data-modal-actions">
+                  <button onClick={goBackToNameEntry} className="data-modal-cancel-btn">
                     Go Back
                   </button>
                   <button 
                     onClick={finalDelete} 
-                    className="modal-confirm-btn"
+                    className="data-modal-confirm-btn"
                   >
                     Confirm Delete
                   </button>
@@ -548,10 +548,10 @@ function DataPage({ onLogout }) {
 
       {/* Process Confirmation Modal */}
       {showProcessModal && (
-        <div className="modal-overlay" onClick={closeProcessModal}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <h3 className="modal-title">Process Data</h3>
-            <p className="modal-description">
+        <div className="data-modal-overlay" onClick={closeProcessModal}>
+          <div className="data-modal-content" onClick={(e) => e.stopPropagation()}>
+            <h3 className="data-modal-title">Process Data</h3>
+            <p className="data-modal-description">
               You are about to process "<strong>{entryToProcess?.name}</strong>".
               <br />
               {pendingFiles[entryToProcess?.id] && (
@@ -563,13 +563,13 @@ function DataPage({ onLogout }) {
               )}
               Click "Start Process" to continue to the processing page.
             </p>
-            <div className="modal-actions">
-              <button onClick={closeProcessModal} className="modal-cancel-btn" disabled={isUploading}>
+            <div className="data-modal-actions">
+              <button onClick={closeProcessModal} className="data-modal-cancel-btn" disabled={isUploading}>
                 Cancel
               </button>
               <button 
                 onClick={startProcess} 
-                className="modal-confirm-btn modal-process-btn"
+                className="data-modal-confirm-btn modal-process-btn"
                 disabled={isUploading}
               >
                 {isUploading ? 'Uploading...' : 'Start Process'}

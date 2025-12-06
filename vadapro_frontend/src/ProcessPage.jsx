@@ -1011,15 +1011,15 @@ function ProcessPage({ onLogout }) {
   return (
     <div className="process-container">
       <header className="process-header">
-        <div className="header-content">
-          <h1>VADAPRO <span className="subtitle">Process{program?.name ? ` - ${program.name}` : ''}{year ? ` (${year})` : ''}</span></h1>
-          <div className="header-actions">
-            <button onClick={handleBack} className="back-btn">
+        <div className="process-header-content">
+          <h1>VADAPRO <span className="process-subtitle">Process{program?.name ? ` - ${program.name}` : ''}{year ? ` (${year})` : ''}</span></h1>
+          <div className="process-header-actions">
+            <button onClick={handleBack} className="process-back-btn">
               ← Back to Data
             </button>
             {onLogout && (
               <div style={{display:'flex',alignItems:'center',gap:'10px'}}>
-                <button onClick={onLogout} className="logout-btn">Logout</button>
+                <button onClick={onLogout} className="process-logout-btn">Logout</button>
                 <span style={{fontSize:'20px',color:'#f0f0f0'}}>{currentUser?.username}</span>
               </div>
             )}
@@ -1311,7 +1311,7 @@ function ProcessPage({ onLogout }) {
 
       {/* Comparison Selection Modal */}
       {showComparisonModal && (
-        <div className="stats-modal-overlay" onClick={() => { setShowComparisonModal(false); resetComparisonModal(); }}>
+        <div className="process-modal-overlay" onClick={() => { setShowComparisonModal(false); resetComparisonModal(); }}>
           <div className="stats-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '600px' }}>
             <div className="stats-modal-header">
               <h2>📊 Add Data Comparison</h2>
@@ -1458,11 +1458,12 @@ function ProcessPage({ onLogout }) {
             </div>
 
             <div className="stats-modal-footer">
-              <button className="modal-btn secondary" onClick={() => { setShowComparisonModal(false); resetComparisonModal(); }}>
-                Cancel
-              </button>
-              <button
-                className="modal-btn primary"
+              <div className="process-modal-actions">
+                <button className="modal-btn secondary" onClick={() => { setShowComparisonModal(false); resetComparisonModal(); }}>
+                  Cancel
+                </button>
+                <button
+                  className="modal-btn primary"
                 onClick={handleAddComparison}
                 disabled={!selectedCurrentQuestion || selectedWorkYearEntries.length === 0}
                 style={{
@@ -1472,6 +1473,7 @@ function ProcessPage({ onLogout }) {
               >
                 Create Comparison ({selectedWorkYearEntries.length} {selectedWorkYearEntries.length === 1 ? 'entry' : 'entries'})
               </button>
+              </div>
             </div>
           </div>
         </div>
@@ -1479,7 +1481,7 @@ function ProcessPage({ onLogout }) {
 
       {/* Statistics Selection Modal */}
       {showStatsModal && (
-        <div className="stats-modal-overlay" onClick={() => setShowStatsModal(false)}>
+        <div className="process-modal-overlay" onClick={() => setShowStatsModal(false)}>
           <div className="stats-modal" onClick={(e) => e.stopPropagation()}>
             <div className="stats-modal-header">
               <h2>📊 Select Statistical Parameters</h2>
@@ -1570,7 +1572,7 @@ function ProcessPage({ onLogout }) {
               <div className="selected-count">
                 {selectedStats.length} parameter{selectedStats.length !== 1 ? 's' : ''} selected
               </div>
-              <div className="modal-actions">
+              <div className="process-modal-actions">
                 <button 
                   className="modal-btn secondary"
                   onClick={clearAllStats}

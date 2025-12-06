@@ -219,10 +219,10 @@ function OrganizationsPage({ onLogout, currentUser }) {
   return (
     <div className="organizations-container">
       <header className="organizations-header">
-        <h1>VADAPRO <span className="subtitle">Organizations</span></h1>
+        <h1>VADAPRO <span className="org-subtitle">Organizations</span></h1>
         {onLogout && (
           <div style={{display:'flex',alignItems:'center',gap:'10px'}}>
-            <button onClick={onLogout} className="logout-btn">Logout</button>
+            <button onClick={onLogout} className="org-logout-btn">Logout</button>
             <span style={{fontSize:'20px',color:'#f0f0f0'}}>{currentUser?.username}</span>
           </div>
         )}
@@ -234,15 +234,15 @@ function OrganizationsPage({ onLogout, currentUser }) {
           
           {/* Message Display */}
           {error && (
-            <div className="message error-message">
+            <div className="org-message org-error-message">
               {error}
-              <button onClick={clearMessages} className="close-message">×</button>
+              <button onClick={clearMessages} className="org-close-message">×</button>
             </div>
           )}
           {success && (
-            <div className="message success-message">
+            <div className="org-message org-success-message">
               {success}
-              <button onClick={clearMessages} className="close-message">×</button>
+              <button onClick={clearMessages} className="org-close-message">×</button>
             </div>
           )}
 
@@ -267,7 +267,7 @@ function OrganizationsPage({ onLogout, currentUser }) {
             </div>
             
             {isLoading && organizations.length === 0 ? (
-              <div className="loading-message">Loading organizations...</div>
+              <div className="org-loading-message">Loading organizations...</div>
             ) : (
               <div className="organizations-grid">
                 {organizations.map(org => (
@@ -356,12 +356,12 @@ function OrganizationsPage({ onLogout, currentUser }) {
 
       {/* Delete Confirmation Modal */}
       {showDeleteModal && (
-        <div className="modal-overlay" onClick={cancelDelete}>
+        <div className="org-modal-overlay" onClick={cancelDelete}>
           <div className="organization-modal-content" onClick={(e) => e.stopPropagation()}>
             {confirmationStep === 'name' ? (
               <>
-                <h3 className="modal-title">Delete Organization</h3>
-                <p className="modal-description">
+                <h3 className="org-modal-title">Delete Organization</h3>
+                <p className="org-modal-description">
                   To confirm deletion of "<strong>{orgToDelete?.name}</strong>", 
                   please type the organization name below:
                 </p>
@@ -373,13 +373,13 @@ function OrganizationsPage({ onLogout, currentUser }) {
                   className="modal-input"
                   autoFocus
                 />
-                <div className="modal-actions">
-                  <button onClick={cancelDelete} className="modal-cancel-btn">
+                <div className="org-modal-actions">
+                  <button onClick={cancelDelete} className="org-modal-cancel-btn">
                     Cancel
                   </button>
                   <button 
                     onClick={proceedToFinalConfirmation} 
-                    className="modal-confirm-btn"
+                    className="org-modal-confirm-btn"
                     disabled={deleteConfirmName !== orgToDelete?.name}
                   >
                     Continue
@@ -388,19 +388,19 @@ function OrganizationsPage({ onLogout, currentUser }) {
               </>
             ) : (
               <>
-                <h3 className="modal-title">Final Confirmation</h3>
-                <p className="modal-description">
+                <h3 className="org-modal-title">Final Confirmation</h3>
+                <p className="org-modal-description">
                   Are you sure you want to delete "<strong>{orgToDelete?.name}</strong>"?
                   <br />
                   <span className="warning-text">This action cannot be undone.</span>
                 </p>
-                <div className="modal-actions">
-                  <button onClick={goBackToNameEntry} className="modal-cancel-btn">
+                <div className="org-modal-actions">
+                  <button onClick={goBackToNameEntry} className="org-modal-cancel-btn">
                     Go Back
                   </button>
                   <button 
                     onClick={finalDelete} 
-                    className="modal-confirm-btn"
+                    className="org-modal-confirm-btn"
                     disabled={isLoading}
                   >
                     {isLoading ? 'Deleting...' : 'Confirm Delete'}
@@ -414,7 +414,7 @@ function OrganizationsPage({ onLogout, currentUser }) {
 
       {/* Member Management Modal */}
       {showMemberModal && selectedOrg && (
-        <div className="modal-overlay" onClick={closeMemberModal}>
+        <div className="org-modal-overlay" onClick={closeMemberModal}>
           <div className="organization-modal-content organization-large-modal" onClick={(e) => e.stopPropagation()}>
             <MemberManagement
               organizationId={selectedOrg._id}
