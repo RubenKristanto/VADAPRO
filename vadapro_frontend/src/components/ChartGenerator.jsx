@@ -179,19 +179,19 @@ const ChartGenerator = ({ entryId, processId, initialCharts = [], onChartsChange
             
             <div style={{ marginBottom: 20 }}>
               <label style={{ display: 'block', marginBottom: 8, fontWeight: 'bold' }}>Select Question:</label>
-              <select value={selectedQuestion || ''} onChange={e => setSelectedQuestion(e.target.value)} style={{ width: '100%', padding: 10, fontSize: 14, borderRadius: 6, border: '1px solid #ddd' }}>
-                <option value="">-- Choose a question --</option>
-                {questions.map(q => <option key={q} value={q}>{q}</option>)}
+              <select value={selectedQuestion || ''} onChange={e => setSelectedQuestion(e.target.value)} style={{ width: '100%', padding: 10, fontSize: 14, borderRadius: 6, border: '1px solid #ddd', color: 'white', background: '#333' }}>
+                <option value="" style={{ color: 'white', background: '#333' }}>-- Choose a question --</option>
+                {questions.map(q => <option key={q} value={q} style={{ color: 'white', background: '#333' }}>{q}</option>)}
               </select>
             </div>
             
             <div style={{ marginBottom: 30 }}>
               <label style={{ display: 'block', marginBottom: 8, fontWeight: 'bold' }}>Chart Type:</label>
-              <select value={chartType} onChange={e => setChartType(e.target.value)} style={{ width: '100%', padding: 10, fontSize: 14, borderRadius: 6, border: '1px solid #ddd' }}>
-                <option value="bar">Bar Chart</option>
-                <option value="line">Line Chart</option>
-                <option value="pie">Pie Chart</option>
-                <option value="scatter">Scatter Chart</option>
+              <select value={chartType} onChange={e => setChartType(e.target.value)} style={{ width: '100%', padding: 10, fontSize: 14, borderRadius: 6, border: '1px solid #ddd', color: 'white', background: '#333' }}>
+                <option value="bar" style={{ color: 'white', background: '#333' }}>Bar Chart</option>
+                <option value="line" style={{ color: 'white', background: '#333' }}>Line Chart</option>
+                <option value="pie" style={{ color: 'white', background: '#333' }}>Pie Chart</option>
+                <option value="scatter" style={{ color: 'white', background: '#333' }}>Scatter Chart</option>
               </select>
             </div>
             
