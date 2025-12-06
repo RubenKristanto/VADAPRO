@@ -134,52 +134,54 @@ const MemberManagement = ({ organizationId, currentUser, onClose }) => {
         {members.length === 0 ? (
           <p>No members found</p>
         ) : (
-          <div className="members-table">
-            <div className="table-header">
-              <span>Username</span>
-              <span>Role</span>
-              <span>Joined</span>
-              {isCurrentUserAdmin && <span>Actions</span>}
-            </div>
-            {members.map((membership) => (
-              <div key={membership._id} className="member-row">
-                <span className="username">{membership.user?.username}</span>
-                <span className={`role ${membership.role}`}>
-                  {membership.role}
-                </span>
-                <span className="joined-date">
-                  {new Date(membership.joinedAt).toLocaleDateString()}
-                </span>
-                {isCurrentUserAdmin && (
-                  <div className="actions">
-                    {membership.role === 'member' && (
-                      <button
-                        className="promote-btn"
-                        onClick={() => handleRoleChange(membership.user?.username, 'admin')}
-                      >
-                        Promote to Admin
-                      </button>
-                    )}
-                    {membership.role === 'admin' && membership.user?.username !== currentUser && (
-                      <button
-                        className="demote-btn"
-                        onClick={() => handleRoleChange(membership.user?.username, 'member')}
-                      >
-                        Demote to Member
-                      </button>
-                    )}
-                    {membership.user?.username !== currentUser && (
-                      <button
-                        className="remove-btn"
-                        onClick={() => handleRemoveUser(membership.user?.username)}
-                      >
-                        Remove
-                      </button>
-                    )}
-                  </div>
-                )}
+          <div className="member-management-wrapper">
+            <div className="members-table">
+              <div className="table-header">
+                <span>Username</span>
+                <span>Role</span>
+                <span>Joined</span>
+                {isCurrentUserAdmin && <span>Actions</span>}
               </div>
-            ))}
+              {members.map((membership) => (
+                <div key={membership._id} className="member-row">
+                  <span className="username">{membership.user?.username}</span>
+                  <span className={`role ${membership.role}`}>
+                    {membership.role}
+                  </span>
+                  <span className="joined-date">
+                    {new Date(membership.joinedAt).toLocaleDateString()}
+                  </span>
+                  {isCurrentUserAdmin && (
+                    <div className="actions">
+                      {membership.role === 'member' && (
+                        <button
+                          className="promote-btn"
+                          onClick={() => handleRoleChange(membership.user?.username, 'admin')}
+                        >
+                          Promote to Admin
+                        </button>
+                      )}
+                      {membership.role === 'admin' && membership.user?.username !== currentUser && (
+                        <button
+                          className="demote-btn"
+                          onClick={() => handleRoleChange(membership.user?.username, 'member')}
+                        >
+                          Demote to Member
+                        </button>
+                      )}
+                      {membership.user?.username !== currentUser && (
+                        <button
+                          className="remove-btn"
+                          onClick={() => handleRemoveUser(membership.user?.username)}
+                        >
+                          Remove
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>

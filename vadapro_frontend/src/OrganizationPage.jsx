@@ -357,7 +357,7 @@ function OrganizationsPage({ onLogout, currentUser }) {
       {/* Delete Confirmation Modal */}
       {showDeleteModal && (
         <div className="modal-overlay" onClick={cancelDelete}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+          <div className="organization-modal-content" onClick={(e) => e.stopPropagation()}>
             {confirmationStep === 'name' ? (
               <>
                 <h3 className="modal-title">Delete Organization</h3>
@@ -415,7 +415,7 @@ function OrganizationsPage({ onLogout, currentUser }) {
       {/* Member Management Modal */}
       {showMemberModal && selectedOrg && (
         <div className="modal-overlay" onClick={closeMemberModal}>
-          <div className="modal-content large-modal" onClick={(e) => e.stopPropagation()}>
+          <div className="organization-modal-content organization-large-modal" onClick={(e) => e.stopPropagation()}>
             <MemberManagement
               organizationId={selectedOrg._id}
               currentUser={currentUser.username}

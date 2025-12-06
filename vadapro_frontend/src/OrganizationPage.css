@@ -304,17 +304,16 @@
   background-color: #4b5563 !important;
 }
 
-/* Large modal for member management */
-.large-modal {
-  max-width: 1400px !important;
-  width: 100vw !important;
-}
-
 .member-management-content {
   display: flex !important;
   flex-direction: column !important;
   gap: 2rem !important;
   margin: 1rem 0 !important;
+}
+
+.member-management-wrapper {
+  max-height: 400px !important;
+  overflow-y: auto !important;
 }
 
 .add-member-section h4,
@@ -619,21 +618,27 @@
   justify-content: center !important;
   z-index: 1000 !important;
   backdrop-filter: blur(4px) !important;
-  padding: 12px !important;
+  padding: 10px !important;
 }
 
-.modal-content {
+.organization-modal-content {
   background: white !important;
   border-radius: var(--fluid-border-radius) !important;
   padding: 2rem !important;
-  max-width: none !important;
+  max-width: 1600px !important;
   width: 95vw !important;
   overflow: auto !important;
-  margin: 0 1rem !important;
+  margin: 0 !important;
   box-shadow: 
     0 20px 25px -5px rgba(0, 0, 0, 0.1),
     0 10px 10px -5px rgba(0, 0, 0, 0.04) !important;
   animation: modalSlideIn 0.3s ease-out !important;
+}
+
+.organization-large-modal {
+  max-width: 800px !important;
+  width: calc(100vw - 20px) !important;
+  border-radius: 100px !important;
 }
 
 @keyframes modalSlideIn {
@@ -736,7 +741,7 @@
 }
 
 /* Responsive adjustments */
-@media (max-width: 768px) {
+@media (max-width: 800px) {
   .organizations-content {
     height: calc(100vh - 50px) !important; /* Smaller header on mobile */
   }
@@ -759,7 +764,7 @@
   }
 }
 
-@media (max-width: 480px) {
+@media (max-width: 800px) {
   .organizations-header {
     padding: 1.5rem 0 !important;
   }
@@ -782,9 +787,15 @@
     font-size: 0.9rem !important;
   }
   
-  .modal-content {
+  .organization-modal-content {
     padding: 1.5rem !important;
     margin: 0 0.5rem !important;
+  }
+
+  /* Preserve large modal width even on small screens */
+  .organization-modal-content.organization-large-modal {
+    max-width: 800px !important;
+    width: 800px !important;
   }
   
   .modal-title {
