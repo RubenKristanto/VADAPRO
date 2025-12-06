@@ -324,7 +324,10 @@ function ProcessPage({ onLogout }) {
       if (!entry?._id && !entry?.id) return;
       try {
         const entryId = entry._id || entry.id;
-        const csvUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/file/gridfs/${entryId}`;
+        // change this line into VITE_API_URL_DEV to use local backend
+        // change /file/gridfs/ to /api/file/gridfs/ according to server.js to ensure correct routing
+        const csvUrl = `${import.meta.env.VITE_API_URL_DEV}/api/file/gridfs/${entryId}`;
+        console.log('Fetching CSV from:', csvUrl);
         const df = await dfd.readCSV(csvUrl);
         setCsvData(df);
         entry.responseCount = df.shape[0]; // Update response count with actual CSV row count
