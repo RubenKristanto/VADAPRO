@@ -153,10 +153,12 @@ export const getUserOrganizations = async (req, res) => {
             })
             .sort({ joinedAt: -1 });
 
-        const organizations = memberships.map(membership => ({
-            ...membership.organization.toObject(),
-            userRole: membership.role
-        }));
+        const organizations = memberships
+            .filter(membership => membership.organization) // Filter out orphaned memberships
+            .map(membership => ({
+                ...membership.organization.toObject(),
+                userRole: membership.role
+            }));
 
         res.status(200).json({
             success: true,
