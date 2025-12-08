@@ -76,7 +76,7 @@ export const getCsvUrl = async (req, res) => {
 export const getCsvFromGridFS = async (req, res) => {
   try {
     const { entryId } = req.params;
-    const bucket = new mongoose.mongo.GridFSBucket(mongoose.connection.db, { bucketName: 'upload' });
+    const bucket = new mongoose.mongo.GridFSBucket(mongoose.connection.db, { bucketName: 'csv_uploads' });
     
     const files = await bucket.find({ 'metadata.entryId': entryId }).toArray();
     if (!files || files.length === 0) {
