@@ -6,17 +6,8 @@ import mongoose from 'mongoose';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-const uploadDir = path.join(__dirname, '../uploads/csv');
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
-}
-
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, uploadDir),
-  filename: (req, file, cb) => cb(null, `${Date.now()}-${file.originalname}`)
-});
+// Use memory storage for serverless compatibility (Vercel)
+const storage = multer.memoryStorage();
 
 const upload = multer({
   storage,
@@ -39,14 +30,33 @@ export const uploadCsv = (req, res) => {
     }
     
     try {
-      const csvUrl = `${req.protocol}://${req.get('host')}/uploads/csv/${req.file.filename}`;
-      const processId = req.body.processId;
+      // Use GridFS for file storage instead of local disk
+      const bucket = new mongoose.mongo.GridFSBucket(mongoose.connection.db, { bucketName: 'csv_uploads' });
+      const uploadStream = bucket.openUploadStream(req.file.originalname, {
+        contentType: req.file.mimetype
+      });
       
-      if (processId) {
-        await Process.findByIdAndUpdate(processId, { csvUrl });
-      }
+      const fileId = uploadStream.id;
       
-      res.json({ success: true, csvUrl, filename: req.file.filename });
+      uploadStream.end(req.file.buffer);
+      
+      uploadStream.on('finish', async () => {
+        // Generate a URL that points to our download endpoint
+        const csvUrl = `${req.protocol}://${req.get('host')}/api/file/download/${fileId}`;
+        const processId = req.body.processId;
+        
+        if (processId) {
+          await Process.findByIdAndUpdate(processId, { csvUrl });
+        }
+        
+        res.json({ success: true, csvUrl, filename: req.file.originalname, fileId });
+      });
+      
+      uploadStream.on('error', (error) => {
+        console.error('GridFS Upload Error:', error);
+        res.status(500).json({ success: false, message: 'Failed to upload file to database' });
+      });
+
     } catch (error) {
       res.status(500).json({ success: false, message: error.message });
     }
