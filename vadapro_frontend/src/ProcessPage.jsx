@@ -326,8 +326,23 @@ function ProcessPage({ onLogout }) {
         const entryId = entry._id || entry.id;
         // change this line into VITE_API_URL_DEV to use local backend
         // change /file/gridfs/ to /api/file/gridfs/ according to server.js to ensure correct routing
-        const csvUrl = `${import.meta.env.VITE_API_URL_DEV}/api/file/gridfs/${entryId}`;
+        const csvUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/file/gridfs/${entryId}`;
         console.log('Fetching CSV from:', csvUrl);
+        
+        // Use fetch first to check if we get a valid CSV or an error JSON
+        const response = await fetch(csvUrl);
+        const contentType = response.headers.get('content-type');
+        
+        if (!response.ok) {
+            throw new Error(`Failed to fetch CSV: ${response.status} ${response.statusText}`);
+        }
+        
+        if (contentType && contentType.includes('application/json')) {
+            const errorJson = await response.json();
+            throw new Error(errorJson.message || 'Server returned JSON error instead of CSV');
+        }
+        
+        // If we get here, it's likely a CSV. Use danfo to read it.
         const df = await dfd.readCSV(csvUrl);
         setCsvData(df);
         entry.responseCount = df.shape[0]; // Update response count with actual CSV row count
