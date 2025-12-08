@@ -326,8 +326,8 @@ function ProcessPage({ onLogout }) {
         const entryId = entry._id || entry.id;
         // change this line into VITE_API_URL_DEV to use local backend
         // change /file/gridfs/ to /api/file/gridfs/ according to server.js to ensure correct routing
-        const API_BASE = import.meta.env.VITE_API_URL || 'https://vadapro-backend.vercel.app';
-        const csvUrl = `${API_BASE}/api/file/gridfs/${entryId}`;
+        const API_BASE = import.meta.env.VITE_API_URL || 'https://vadapro-backend.vercel.app/api';
+        const csvUrl = `${API_BASE}/file/gridfs/${entryId}`;
         console.log('Fetching CSV from:', csvUrl);
         const df = await dfd.readCSV(csvUrl);
         setCsvData(df);
